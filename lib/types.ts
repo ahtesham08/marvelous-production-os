@@ -138,6 +138,80 @@ export type UserRecord = {
   updated_at: string | null;
 };
 
+export type BrainstormingSessionStatus = "Draft" | "Live" | "Completed" | "Archived";
+
+export type BrainstormingTitleStatus =
+  | "Proposed"
+  | "Approved"
+  | "Rejected"
+  | "Hold"
+  | "Needs Better Angle"
+  | "Needs Research"
+  | "Duplicate"
+  | "Converted To Production";
+
+export type BrainstormingSession = {
+  id: string;
+  name: string;
+  session_date: string;
+  channels: string[] | null;
+  participants: string[] | null;
+  notes: string | null;
+  status: BrainstormingSessionStatus | string;
+  created_by: string | null;
+  created_by_name: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type BrainstormingTitle = {
+  id: string;
+  session_id: string | null;
+  title: string;
+  normalized_title: string | null;
+  channel: string | null;
+  priority: string | null;
+  submitted_by: string | null;
+  submitted_by_name: string | null;
+  supervisor: string | null;
+  short_pitch: string | null;
+  why_good: string | null;
+  reference_links: string | null;
+  suggested_writer: string | null;
+  notes: string | null;
+  ahtesham_notes: string | null;
+  discussion_summary: string | null;
+  status: BrainstormingTitleStatus | string;
+  decision_status: string | null;
+  decision_reason: string | null;
+  decided_by: string | null;
+  decided_by_name: string | null;
+  decided_at: string | null;
+  converted_title_id: string | null;
+  converted_at: string | null;
+  duplicate_warning: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  brainstorming_discussion_notes?: BrainstormingDiscussionNote[];
+};
+
+export type BrainstormingDiscussionNote = {
+  id: string;
+  brainstorming_title_id: string | null;
+  note_text: string;
+  author_id: string | null;
+  author_name: string | null;
+  created_at: string | null;
+};
+
+export type BrainstormingSummary = {
+  todaySessions: number;
+  pendingProposed: number;
+  approvedNotConverted: number;
+  needsBetterAngle: number;
+  needsResearch: number;
+};
+
 export type TitleAlert = {
   type: AlertType;
   severity: Severity;
@@ -230,4 +304,5 @@ export type DashboardData = {
   dailyReport: string;
   completedThisWeek: EnrichedTitle[];
   lastSyncAt: string | null;
+  brainstormingSummary?: BrainstormingSummary;
 };

@@ -1,149 +1,98 @@
-"use client";
+import Link from "next/link";
+import { CalendarPlus, ClipboardList, Radio, Send, Table2 } from "lucide-react";
+import { BrainstormingStatusBadge } from "@/components/brainstorming/BrainstormingStatusBadge";
+import { getBrainstormingSessions, getBrainstormingSummary, getBrainstormingTitles } from "@/lib/brainstorming";
 
-import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { ClipboardList, Plus } from "lucide-react";
+export const dynamic = "force-dynamic";
 
-const channels = ["MV N", "LL", "Gamers", "Anime", "Long Reads"];
-const priorities = ["Normal", "Urgent", "High", "Low"];
+const actions = [
+  { href: "/brainstorming/sessions/new", label: "Create Session", icon: CalendarPlus },
+  { href: "/brainstorming/submit", label: "Submit Title", icon: Send },
+  { href: "/brainstorming/import", label: "Import WhatsApp Paste", icon: ClipboardList },
+  { href: "/brainstorming/title-bank", label: "Title Bank", icon: Table2 }
+];
 
-type PreviewTitle = {
-  title: string;
-  channel: string;
-  supervisor: string;
-  priority: string;
-  writer: string;
-};
-
-export default function BrainstormingPage() {
-  const router = useRouter();
-  const [text, setText] = useState("");
-  const [state, setState] = useState<"idle" | "saving" | "error">("idle");
-  const [message, setMessage] = useState<string | null>(null);
-  const preview = useMemo(() => parsePaste(text), [text]);
-
-  async function createBatch() {
-    setState("saving");
-    setMessage(null);
-
-    const response = await fetch("/api/brainstorming", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ titles: preview })
-    });
-    const payload = await response.json();
-
-    if (!response.ok) {
-      setState("error");
-      setMessage(payload.error || "Unable to create approved titles.");
-      return;
-    }
-
-    router.push("/titles");
-  }
+export default async function BrainstormingPage() {
+  const [summary, sessions, titles] = await Promise.all([
+    getBrainstormingSummary(),
+    getBrainstormingSessions(),
+    getBrainstormingTitles()
+  ]);
+  const activeSessions = sessions.filter((session) => session.status !== "Archived").slice(0, 4);
 
   return (
     <div className="space-y-5">
-      <div>
-        <p className="text-sm font-semibold uppercase text-moss">Brainstorming Batch Entry</p>
-        <h1 className="mt-1 text-3xl font-semibold text-ink">Create Approved Titles From Paste</h1>
-        <p className="mt-2 text-sm text-black/60">
-          Paste one title per line, or use: Title | Channel | Supervisor | Priority | Writer
+      <section className="rounded-lg border border-black/10 bg-white p-5 shadow-soft">
+        <p className="text-sm font-semibold uppercase text-moss">Brainstorming Module</p>
+        <h1 className="mt-1 text-3xl font-semibold text-ink">Meeting Title Review</h1>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-black/65">
+          Supervisors submit ideas before the meeting, Ahtesham reviews them live, and approved titles convert into production tasks.
         </p>
-      </div>
-
-      <section className="grid gap-4 lg:grid-cols-[1fr_420px]">
-        <div className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
-          <label className="block">
-            <span className="flex items-center gap-2 text-sm font-semibold text-ink">
-              <ClipboardList size={16} />
-              Approved Titles
-            </span>
-            <textarea
-              className="field-input mt-3 min-h-[320px] font-mono"
-              value={text}
-              onChange={(event) => setText(event.target.value)}
-              placeholder={"WTF Happened to Gargoyles | MV N | Raktim | Urgent | Rishi\nThe Goonies 2 Everything We Know | LL | Kamran"}
-            />
-          </label>
-        </div>
-
-        <aside className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
-          <h2 className="text-lg font-semibold text-ink">Preview</h2>
-          <p className="mt-1 text-sm text-black/55">{preview.length} approved titles ready.</p>
-          <button
-            type="button"
-            onClick={createBatch}
-            disabled={state === "saving" || preview.length === 0}
-            className="focus-ring mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white transition hover:bg-moss disabled:opacity-60"
-          >
-            <Plus size={16} />
-            {state === "saving" ? "Creating" : "Create Approved Titles"}
-          </button>
-          {message ? <p className="mt-3 rounded-md bg-red-50 p-3 text-sm font-medium text-danger">{message}</p> : null}
-        </aside>
       </section>
 
-      <div className="overflow-hidden rounded-lg border border-black/10 bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-black/10 text-left text-sm">
-            <thead className="bg-[#eef1eb] text-xs uppercase text-black/55">
-              <tr>
-                <th className="px-4 py-3">Title</th>
-                <th className="px-4 py-3">Channel</th>
-                <th className="px-4 py-3">Supervisor</th>
-                <th className="px-4 py-3">Priority</th>
-                <th className="px-4 py-3">Writer</th>
-                <th className="px-4 py-3">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-black/10">
-              {preview.map((item, index) => (
-                <tr key={`${item.title}-${index}`}>
-                  <td className="px-4 py-3 font-medium text-ink">{item.title}</td>
-                  <td className="px-4 py-3">{item.channel}</td>
-                  <td className="px-4 py-3">{item.supervisor || "Missing"}</td>
-                  <td className="px-4 py-3">{item.priority}</td>
-                  <td className="px-4 py-3">{item.writer || "Optional"}</td>
-                  <td className="px-4 py-3">Approved</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {preview.length === 0 ? <div className="px-4 py-10 text-center text-sm text-black/55">Paste titles to preview.</div> : null}
+      <div className="grid gap-3 md:grid-cols-4">
+        <Metric label="Today Sessions" value={summary.todaySessions} />
+        <Metric label="Pending Proposed" value={summary.pendingProposed} />
+        <Metric label="Approved Not Converted" value={summary.approvedNotConverted} />
+        <Metric label="Needs Rework" value={summary.needsBetterAngle + summary.needsResearch} />
       </div>
+
+      <section className="grid gap-3 md:grid-cols-4">
+        {actions.map((action) => (
+          <Link key={action.href} href={action.href} className="rounded-lg border border-black/10 bg-white p-4 font-semibold text-ink shadow-sm transition hover:border-moss hover:text-moss">
+            <action.icon size={18} />
+            <div className="mt-3">{action.label}</div>
+          </Link>
+        ))}
+      </section>
+
+      <section className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl font-semibold text-ink">Active Sessions</h2>
+          <Link href="/brainstorming/sessions" className="text-sm font-semibold text-moss hover:underline">View all</Link>
+        </div>
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          {activeSessions.map((session) => (
+            <Link key={session.id} href={`/brainstorming/live/${session.id}`} className="rounded-lg border border-black/10 bg-[#f6f4ee] p-4 transition hover:border-moss">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="font-semibold text-ink">{session.name}</h3>
+                  <p className="mt-1 text-sm text-black/60">{session.session_date}</p>
+                </div>
+                <BrainstormingStatusBadge status={session.status} />
+              </div>
+            </Link>
+          ))}
+        </div>
+        {activeSessions.length === 0 ? <p className="mt-3 text-sm text-black/55">No active sessions yet. Create one before the meeting.</p> : null}
+      </section>
+
+      <section className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
+        <div className="flex items-center gap-2">
+          <Radio size={18} className="text-moss" />
+          <h2 className="text-xl font-semibold text-ink">Latest Proposed Titles</h2>
+        </div>
+        <div className="mt-3 space-y-2">
+          {titles.slice(0, 8).map((title) => (
+            <div key={title.id} className="flex flex-col gap-2 rounded-md bg-[#f6f4ee] p-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="font-medium text-ink">{title.title}</div>
+                <div className="text-xs text-black/55">{title.supervisor || title.submitted_by_name || "Unassigned"} | {title.channel}</div>
+              </div>
+              <BrainstormingStatusBadge status={title.status} />
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
 
-function parsePaste(value: string): PreviewTitle[] {
-  return value
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const parts = line.includes("|")
-        ? line.split("|").map((part) => part.trim())
-        : [line, "", "", "", ""];
-
-      return {
-        title: parts[0] ?? "",
-        channel: normalizeChannel(parts[1]),
-        supervisor: parts[2] ?? "",
-        priority: normalizePriority(parts[3]),
-        writer: parts[4] ?? ""
-      };
-    })
-    .filter((item) => item.title.length > 0);
-}
-
-function normalizeChannel(value: string | undefined) {
-  const match = channels.find((channel) => channel.toLowerCase() === String(value ?? "").trim().toLowerCase());
-  return match ?? "MV N";
-}
-
-function normalizePriority(value: string | undefined) {
-  const match = priorities.find((priority) => priority.toLowerCase() === String(value ?? "").trim().toLowerCase());
-  return match ?? "Normal";
+function Metric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
+      <div className="text-3xl font-semibold text-ink">{value}</div>
+      <div className="mt-2 text-sm font-medium text-black/60">{label}</div>
+    </div>
+  );
 }

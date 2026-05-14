@@ -417,3 +417,62 @@ It checks:
 12. Confirm `/admin/export` downloads CSVs.
 13. Confirm `/admin/import-old-sheets` remains archive-only.
 14. Confirm write-back endpoint stays disabled.
+
+## Brainstorming Module
+
+The brainstorming workflow is now separate from the production workflow until Ahtesham approves and converts a title.
+
+Routes:
+
+- `/brainstorming` - brainstorming hub and quick metrics.
+- `/brainstorming/sessions` - all brainstorming sessions.
+- `/brainstorming/sessions/new` - create a meeting session.
+- `/brainstorming/submit` - supervisors submit one title idea with pitch, references, and suggested writer.
+- `/brainstorming/import` - manually paste numbered WhatsApp lists and preview/edit before saving.
+- `/brainstorming/live/[sessionId]` - meeting-friendly review board grouped by supervisor.
+- `/brainstorming/approved` - approved and converted ideas.
+- `/brainstorming/rejected` - rejected and duplicate ideas with reasons.
+- `/brainstorming/rework` - hold, needs better angle, and needs research ideas.
+- `/brainstorming/title-bank` - all brainstorming ideas across sessions.
+
+Decision statuses:
+
+- Proposed
+- Approved
+- Rejected
+- Hold
+- Needs Better Angle
+- Needs Research
+- Duplicate
+- Converted To Production
+
+Admin workflow:
+
+1. Create a session from `/brainstorming/sessions/new`.
+2. Ask supervisors to submit titles or paste WhatsApp lists into `/brainstorming/import`.
+3. Open `/brainstorming/live/[sessionId]` during the meeting.
+4. Approve, reject, hold, or mark titles as needing better angle/research.
+5. For approved titles, click `Create Production Title`.
+6. The approved idea becomes a normal title in the existing production dashboard.
+
+Supervisor workflow:
+
+1. Open `/brainstorming/submit`.
+2. Add title, channel, priority, short pitch, why the title is good, references, and suggested writer.
+3. Add discussion notes during the meeting if needed.
+4. Rework titles shown under `/brainstorming/rework`.
+
+Data safety:
+
+- Old Google Sheets remain archive/reference only.
+- No Google Sheets write-back is added.
+- Approved brainstorming titles are copied into the existing `titles` table only when Admin explicitly converts them.
+- Converted titles store `source = Brainstorming`, `source_session_id`, and `source_brainstorming_title_id`.
+
+New migration:
+
+```text
+supabase/migrations/005_brainstorming_module.sql
+```
+
+Run this migration before using the new brainstorming routes in production.

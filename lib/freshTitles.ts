@@ -2,9 +2,9 @@ import { normalizeTitle } from "@/lib/titleNormalizer";
 import { createLocalFreshTitles } from "@/lib/localStore";
 import { createSupabaseAdminClient, hasSupabaseAdminConfig } from "@/lib/supabaseServer";
 import { isProductionMode } from "@/lib/appMode";
+import { FRESH_START_CHANNELS, PRIORITIES } from "@/lib/sharedConstants";
 
-export const FRESH_START_CHANNELS = ["MV N", "LL", "Gamers", "Anime", "Long Reads"] as const;
-export const PRIORITIES = ["Normal", "Urgent", "High", "Low"] as const;
+export { FRESH_START_CHANNELS, PRIORITIES };
 
 export type FreshTitleInput = {
   title: string;

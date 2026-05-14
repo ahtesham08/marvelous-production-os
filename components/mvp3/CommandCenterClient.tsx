@@ -3,14 +3,16 @@
 import { useMemo, useState } from "react";
 import { SectionList } from "@/components/mvp3/SectionList";
 import { isCompletedThisWeek, isCompletedToday, isOverdue, operationsSections } from "@/lib/mvp3Views";
-import type { EnrichedTitle, SupervisorSummary } from "@/lib/types";
+import type { BrainstormingSummary, EnrichedTitle, SupervisorSummary } from "@/lib/types";
 
 export function CommandCenterClient({
   titles,
-  supervisorSummary
+  supervisorSummary,
+  brainstormingSummary
 }: {
   titles: EnrichedTitle[];
   supervisorSummary: SupervisorSummary[];
+  brainstormingSummary?: BrainstormingSummary;
 }) {
   const [channel, setChannel] = useState("All");
   const [supervisor, setSupervisor] = useState("All");
@@ -39,6 +41,19 @@ export function CommandCenterClient({
 
   return (
     <div className="space-y-5">
+      {brainstormingSummary ? (
+        <section className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
+          <h2 className="text-xl font-semibold text-ink">Brainstorming</h2>
+          <div className="mt-3 grid gap-3 md:grid-cols-5">
+            <BrainstormingMetric label="Today Sessions" value={brainstormingSummary.todaySessions} />
+            <BrainstormingMetric label="Pending Proposed" value={brainstormingSummary.pendingProposed} />
+            <BrainstormingMetric label="Approved Not Converted" value={brainstormingSummary.approvedNotConverted} />
+            <BrainstormingMetric label="Needs Better Angle" value={brainstormingSummary.needsBetterAngle} />
+            <BrainstormingMetric label="Needs Research" value={brainstormingSummary.needsResearch} />
+          </div>
+        </section>
+      ) : null}
+
       <div className="grid gap-3 rounded-lg border border-black/10 bg-white p-3 shadow-sm md:grid-cols-5">
         <Filter label="Channel" value={channel} options={channels} onChange={setChannel} />
         <Filter label="Supervisor" value={supervisor} options={supervisors} onChange={setSupervisor} />
@@ -75,6 +90,15 @@ export function CommandCenterClient({
           { title: "Completed This Week", titles: filtered.filter(isCompletedThisWeek) }
         ]}
       />
+    </div>
+  );
+}
+
+function BrainstormingMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-md bg-[#f6f4ee] p-3">
+      <div className="text-2xl font-semibold text-ink">{value}</div>
+      <div className="mt-1 text-xs font-semibold uppercase text-black/50">{label}</div>
     </div>
   );
 }
