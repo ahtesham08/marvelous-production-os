@@ -7,3 +7,5 @@ coverage
 *.tsbuildinfo
 dev-server*.log
 .data
+
+.vercel
