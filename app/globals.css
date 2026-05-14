@@ -58,18 +58,29 @@ textarea {
   background-color: #17201c !important;
 }
 
-.dark [class*="bg-paper"],
-.dark [class*="bg-\\[\\#f6f4ee\\]"],
-.dark [class*="bg-\\[\\#eef1eb\\]"] {
+.dark [class*="bg-paper"] {
   background-color: #111916 !important;
 }
 
-.dark [class*="bg-\\[\\#fff8ec\\]"] {
+.dark .bg-\[\#f6f4ee\],
+.dark .hover\:bg-\[\#f6f4ee\]:hover {
+  background-color: #1c2722 !important;
+}
+
+.dark .bg-\[\#eef1eb\] {
+  background-color: #223128 !important;
+}
+
+.dark .bg-\[\#fff8ec\] {
   background-color: rgba(197, 134, 52, 0.14) !important;
 }
 
-.dark [class*="bg-\\[\\#fff0ef\\]"] {
+.dark .bg-\[\#fff0ef\] {
   background-color: rgba(184, 64, 58, 0.16) !important;
+}
+
+.dark .bg-\[\#eef8f0\] {
+  background-color: rgba(47, 133, 90, 0.16) !important;
 }
 
 .dark [class*="border-black"] {

@@ -9,15 +9,8 @@ export function ThemeToggle() {
   const [theme, setTheme] = useState<Theme>("light");
 
   useEffect(() => {
-    const stored = window.localStorage.getItem("marvelous-theme");
-    const initial =
-      stored === "dark" || stored === "light"
-        ? stored
-        : window.matchMedia("(prefers-color-scheme: dark)").matches
-          ? "dark"
-          : "light";
-    applyTheme(initial);
-    setTheme(initial);
+    window.localStorage.removeItem("marvelous-theme");
+    applyTheme("light");
   }, []);
 
   function toggleTheme() {
@@ -42,5 +35,4 @@ export function ThemeToggle() {
 function applyTheme(theme: Theme) {
   document.documentElement.classList.toggle("dark", theme === "dark");
   document.documentElement.style.colorScheme = theme;
-  window.localStorage.setItem("marvelous-theme", theme);
 }
