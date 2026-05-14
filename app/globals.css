@@ -8,6 +8,12 @@
   color: #17201c;
 }
 
+.dark {
+  color-scheme: dark;
+  background: #0f1513;
+  color: #f6f4ee;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -18,6 +24,14 @@ body {
     linear-gradient(180deg, rgba(246, 244, 238, 0.96), rgba(235, 238, 231, 0.94)),
     #f6f4ee;
   color: #17201c;
+}
+
+.dark body {
+  background:
+    radial-gradient(circle at top left, rgba(197, 134, 52, 0.12), transparent 28rem),
+    linear-gradient(180deg, rgba(15, 21, 19, 0.98), rgba(23, 32, 28, 0.96)),
+    #0f1513;
+  color: #f6f4ee;
 }
 
 a {
@@ -33,9 +47,59 @@ textarea {
 }
 
 .focus-ring {
-  @apply focus:outline-none focus:ring-2 focus:ring-moss focus:ring-offset-2 focus:ring-offset-paper;
+  @apply focus:outline-none focus:ring-2 focus:ring-moss focus:ring-offset-2 focus:ring-offset-paper dark:focus:ring-amberline dark:focus:ring-offset-[#0f1513];
 }
 
 .field-input {
-  @apply w-full rounded-md border border-black/15 bg-white px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-moss focus:ring-offset-2 focus:ring-offset-paper;
+  @apply w-full rounded-md border border-black/15 bg-white px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-moss focus:ring-offset-2 focus:ring-offset-paper dark:border-white/15 dark:bg-[#111916] dark:text-[#f6f4ee] dark:placeholder:text-white/40 dark:focus:ring-amberline dark:focus:ring-offset-[#0f1513];
+}
+
+.dark [class*="bg-white"] {
+  background-color: #17201c !important;
+}
+
+.dark [class*="bg-paper"],
+.dark [class*="bg-\\[\\#f6f4ee\\]"],
+.dark [class*="bg-\\[\\#eef1eb\\]"] {
+  background-color: #111916 !important;
+}
+
+.dark [class*="bg-\\[\\#fff8ec\\]"] {
+  background-color: rgba(197, 134, 52, 0.14) !important;
+}
+
+.dark [class*="bg-\\[\\#fff0ef\\]"] {
+  background-color: rgba(184, 64, 58, 0.16) !important;
+}
+
+.dark [class*="border-black"] {
+  border-color: rgba(255, 255, 255, 0.14) !important;
+}
+
+.dark [class*="text-ink"],
+.dark [class*="text-black"],
+.dark [class*="text-slate"],
+.dark [class*="text-neutral"],
+.dark [class*="text-zinc"] {
+  color: #f6f4ee !important;
+}
+
+.dark [class*="text-moss"] {
+  color: #93b5a7 !important;
+}
+
+.dark input,
+.dark select,
+.dark textarea {
+  border-color: rgba(255, 255, 255, 0.16);
+  background-color: #111916;
+  color: #f6f4ee;
+}
+
+.dark table thead {
+  background-color: #111916;
+}
+
+.dark tr:hover {
+  background-color: rgba(246, 244, 238, 0.05) !important;
 }

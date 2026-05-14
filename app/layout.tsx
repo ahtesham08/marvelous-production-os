@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Script from "next/script";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { getAppMode } from "@/lib/appMode";
 import { getCurrentUserContext } from "@/lib/serverAuth";
 import "./globals.css";
@@ -39,13 +41,29 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const userName = userContext.user?.name ?? (userContext.authEmail || "Demo User");
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen antialiased">
+        <Script id="marvelous-theme-init" strategy="beforeInteractive">
+          {`
+            (function () {
+              try {
+                var stored = localStorage.getItem('marvelous-theme');
+                var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                var theme = stored || (prefersDark ? 'dark' : 'light');
+                document.documentElement.classList.toggle('dark', theme === 'dark');
+                document.documentElement.style.colorScheme = theme;
+              } catch (error) {}
+            })();
+          `}
+        </Script>
         <header className="border-b border-black/10 bg-paper/85 backdrop-blur lg:hidden">
           <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6">
-            <Link href="/" className="text-xl font-semibold tracking-[0] text-ink">
-              Marvelous Production OS
-            </Link>
+            <div className="flex items-center justify-between gap-3">
+              <Link href="/" className="text-xl font-semibold tracking-[0] text-ink">
+                Marvelous Production OS
+              </Link>
+              <ThemeToggle />
+            </div>
             <div className="flex flex-wrap gap-2 text-xs font-semibold">
               <span className="rounded-md bg-ink px-2 py-1 text-white">{modeLabel(mode)}</span>
               <span className="rounded-md bg-white px-2 py-1 text-moss">{userName} | {role}</span>
@@ -65,9 +83,12 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         </header>
         <div className="lg:flex">
           <aside className="sticky top-0 hidden h-screen w-64 shrink-0 overflow-y-auto border-r border-black/10 bg-white p-4 lg:block">
-            <Link href="/" className="block text-xl font-semibold text-ink">
-              Marvelous Production OS
-            </Link>
+            <div className="flex items-start justify-between gap-3">
+              <Link href="/" className="block text-xl font-semibold text-ink">
+                Marvelous Production OS
+              </Link>
+              <ThemeToggle />
+            </div>
             <div className="mt-2 rounded-md bg-[#eef1eb] px-2 py-1 text-xs font-semibold uppercase text-moss">
               {modeLabel(mode)}
             </div>
