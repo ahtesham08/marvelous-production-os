@@ -168,6 +168,7 @@ function normalizeChannel(value: string | null | undefined) {
 function normalizePriority(value: string | null | undefined) {
   const cleaned = clean(value);
   if (!cleaned) return "Normal";
+  if (cleaned.toLowerCase() === "high") return "Urgent";
   const match = PRIORITIES.find((priority) => priority.toLowerCase() === cleaned.toLowerCase());
   return match ?? "Normal";
 }

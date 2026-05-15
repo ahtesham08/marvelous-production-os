@@ -1,7 +1,7 @@
 import type { BrainstormingSession, BrainstormingTitle } from "@/lib/types";
 
 export const FRESH_START_CHANNELS = ["MV N", "LL", "Gamers", "Anime", "Long Reads"] as const;
-export const PRIORITIES = ["Normal", "Urgent", "High", "Low"] as const;
+export const PRIORITIES = ["Low", "Normal", "Urgent", "ULTRA URGENT"] as const;
 
 export const BRAINSTORMING_DECISIONS = [
   "Approve",

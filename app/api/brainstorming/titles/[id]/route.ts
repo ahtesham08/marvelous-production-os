@@ -3,6 +3,7 @@ import {
   addBrainstormingNote,
   convertBrainstormingTitle,
   decideBrainstormingTitle,
+  getBrainstormingTitle,
   updateBrainstormingProposal,
   updateBrainstormingTitleNotes
 } from "@/lib/brainstorming";
@@ -22,8 +23,11 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
     if (payload.action === "decision") {
       if (!isAdmin(userContext.user?.role)) return NextResponse.json({ error: "Only Admin can decide titles." }, { status: 403 });
-      await decideBrainstormingTitle(id, payload.decision, payload.reason, userContext.user);
-      return NextResponse.json({ ok: true });
+      await decideBrainstormingTitle(id, payload.decision, payload.reason, userContext.user, {
+        urgency: payload.urgency,
+        dueDate: payload.dueDate
+      });
+      return NextResponse.json({ ok: true, title: await getBrainstormingTitle(id) });
     }
 
     if (payload.action === "note") {
@@ -31,13 +35,13 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         return NextResponse.json({ error: "Only Admin and Supervisors can add notes." }, { status: 403 });
       }
       await addBrainstormingNote(id, payload.noteText, userContext.user);
-      return NextResponse.json({ ok: true });
+      return NextResponse.json({ ok: true, title: await getBrainstormingTitle(id) });
     }
 
     if (payload.action === "meeting-notes") {
       if (!isAdmin(userContext.user?.role)) return NextResponse.json({ error: "Only Admin can edit meeting notes." }, { status: 403 });
       await updateBrainstormingTitleNotes(id, payload.ahteshamNotes, payload.discussionSummary);
-      return NextResponse.json({ ok: true });
+      return NextResponse.json({ ok: true, title: await getBrainstormingTitle(id) });
     }
 
     if (payload.action === "proposal") {
@@ -45,13 +49,13 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         return NextResponse.json({ error: "Only Admin and Supervisors can edit proposed ideas." }, { status: 403 });
       }
       await updateBrainstormingProposal(id, payload);
-      return NextResponse.json({ ok: true });
+      return NextResponse.json({ ok: true, title: await getBrainstormingTitle(id) });
     }
 
     if (payload.action === "convert") {
       if (!isAdmin(userContext.user?.role)) return NextResponse.json({ error: "Only Admin can convert titles." }, { status: 403 });
       const title = await convertBrainstormingTitle(id, userContext.user);
-      return NextResponse.json({ title });
+      return NextResponse.json({ title, brainstormingTitle: await getBrainstormingTitle(id) });
     }
 
     return NextResponse.json({ error: "Unknown brainstorming action." }, { status: 400 });

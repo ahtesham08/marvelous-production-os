@@ -27,6 +27,8 @@ export type BrainstormingTitleInput = {
   title: string;
   channel?: string | null;
   priority?: string | null;
+  urgency?: string | null;
+  dueDate?: string | null;
   supervisor?: string | null;
   shortPitch?: string | null;
   whyGood?: string | null;
@@ -187,6 +189,8 @@ export async function createBrainstormingTitles(inputs: BrainstormingTitleInput[
       normalized_title: normalized,
       channel: input.channel,
       priority: input.priority,
+      urgency: input.urgency,
+      approved_due_date: input.dueDate,
       submitted_by: user?.id?.startsWith("demo-") ? null : user?.id ?? null,
       submitted_by_name: user?.name ?? input.supervisor,
       supervisor: input.supervisor || user?.name || null,
@@ -244,14 +248,18 @@ export async function decideBrainstormingTitle(
   titleId: string,
   decision: string,
   reason: string | null,
-  user: UserRecord | null
+  user: UserRecord | null,
+  options: { urgency?: string | null; dueDate?: string | null } = {}
 ) {
   const now = new Date().toISOString();
   const status = decisionToStatus(decision);
+  const urgency = normalizePriority(options.urgency);
+  const dueDate = normalizeDate(options.dueDate);
   const patch = {
     status,
     decision_status: status,
     decision_reason: clean(reason),
+    ...(status === "Approved" ? { priority: urgency, urgency, approved_due_date: dueDate } : {}),
     decided_by: user?.id?.startsWith("demo-") ? null : user?.id ?? null,
     decided_by_name: user?.name ?? "Ahtesham",
     decided_at: now,
@@ -370,7 +378,7 @@ export async function convertBrainstormingTitle(titleId: string, user: UserRecor
       title: title.title,
       normalized_title: normalizeTitle(title.title),
       channel_id: channelId,
-      priority: title.priority || "Normal",
+      priority: title.urgency || title.priority || "Normal",
       source: "Brainstorming",
       source_session_id: title.session_id,
       source_brainstorming_title_id: title.id,
@@ -378,6 +386,7 @@ export async function convertBrainstormingTitle(titleId: string, user: UserRecor
       approved_by: user?.id?.startsWith("demo-") ? null : user?.id ?? null,
       imported_supervisor_name: title.supervisor || title.submitted_by_name,
       imported_writer_name: title.suggested_writer,
+      writer_due_date: title.approved_due_date,
       notes: title.ahtesham_notes || title.notes,
       current_status: "Approved",
       match_status: "Fresh Start",
@@ -457,6 +466,8 @@ function normalizeBrainstormingInput(input: BrainstormingTitleInput) {
     title: clean(input.title) || "",
     channel: normalizeChannel(input.channel),
     priority: normalizePriority(input.priority),
+    urgency: normalizePriority(input.urgency || input.priority),
+    dueDate: normalizeDate(input.dueDate),
     supervisor: clean(input.supervisor),
     shortPitch: clean(input.shortPitch),
     whyGood: clean(input.whyGood),
@@ -479,6 +490,8 @@ function toLocalBrainstormingTitle(
     normalized_title: normalizeTitle(input.title),
     channel: input.channel,
     priority: input.priority,
+    urgency: input.urgency,
+    approved_due_date: input.dueDate,
     submitted_by: null,
     submitted_by_name: user?.name ?? input.supervisor,
     supervisor: input.supervisor || user?.name || null,
@@ -518,8 +531,15 @@ function normalizeChannel(value: string | null | undefined) {
 
 function normalizePriority(value: string | null | undefined) {
   const cleaned = clean(value);
+  if (String(cleaned ?? "").toLowerCase() === "high") return "Urgent";
   const match = PRIORITIES.find((priority) => priority.toLowerCase() === String(cleaned ?? "").toLowerCase());
   return match ?? "Normal";
+}
+
+function normalizeDate(value: string | null | undefined) {
+  const cleaned = clean(value);
+  if (!cleaned) return null;
+  return /^\d{4}-\d{2}-\d{2}$/.test(cleaned) ? cleaned : null;
 }
 
 function normalizeList(values: string[]) {

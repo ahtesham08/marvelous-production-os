@@ -171,6 +171,8 @@ export type BrainstormingTitle = {
   normalized_title: string | null;
   channel: string | null;
   priority: string | null;
+  urgency: string | null;
+  approved_due_date: string | null;
   submitted_by: string | null;
   submitted_by_name: string | null;
   supervisor: string | null;
