@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { CalendarPlus, ClipboardList, Radio, Send, Table2 } from "lucide-react";
 import { BrainstormingStatusBadge } from "@/components/brainstorming/BrainstormingStatusBadge";
-import { getBrainstormingSessions, getBrainstormingSummary, getBrainstormingTitles } from "@/lib/brainstorming";
+import {
+  getBrainstormingSessionsWithDailyEnsure,
+  getBrainstormingSummary,
+  getBrainstormingTitles
+} from "@/lib/brainstorming";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +19,7 @@ const actions = [
 export default async function BrainstormingPage() {
   const [summary, sessions, titles] = await Promise.all([
     getBrainstormingSummary(),
-    getBrainstormingSessions(),
+    getBrainstormingSessionsWithDailyEnsure(),
     getBrainstormingTitles()
   ]);
   const activeSessions = sessions.filter((session) => session.status !== "Archived").slice(0, 4);

@@ -56,7 +56,8 @@ type BrainstormingStore = {
 const storePath = path.join(process.cwd(), ".data", "brainstorming-store.json");
 
 export async function getBrainstormingSummary(): Promise<BrainstormingSummary> {
-  const today = new Date().toISOString().slice(0, 10);
+  await ensureDailyBrainstormingSession();
+  const today = getSessionDateParts(new Date()).date;
   const [sessions, titles] = await Promise.all([getBrainstormingSessions(), getBrainstormingTitles()]);
   return {
     todaySessions: sessions.filter((session) => session.session_date === today && session.status !== "Archived").length,
@@ -82,6 +83,11 @@ export async function getBrainstormingSessions() {
   if (error && isMissingBrainstormingTable(error)) return [];
   if (error) throw error;
   return (data ?? []) as BrainstormingSession[];
+}
+
+export async function getBrainstormingSessionsWithDailyEnsure() {
+  await ensureDailyBrainstormingSession();
+  return getBrainstormingSessions();
 }
 
 export async function getBrainstormingSession(sessionId: string) {

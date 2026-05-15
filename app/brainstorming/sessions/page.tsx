@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { BrainstormingStatusBadge } from "@/components/brainstorming/BrainstormingStatusBadge";
-import { getBrainstormingSessions, getBrainstormingTitles } from "@/lib/brainstorming";
+import { getBrainstormingSessionsWithDailyEnsure, getBrainstormingTitles } from "@/lib/brainstorming";
 
 export const dynamic = "force-dynamic";
 
 export default async function BrainstormingSessionsPage() {
-  const [sessions, titles] = await Promise.all([getBrainstormingSessions(), getBrainstormingTitles()]);
+  const [sessions, titles] = await Promise.all([getBrainstormingSessionsWithDailyEnsure(), getBrainstormingTitles()]);
 
   return (
     <div className="space-y-5">

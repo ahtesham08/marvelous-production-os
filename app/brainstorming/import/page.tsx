@@ -1,10 +1,10 @@
 import { WhatsAppImportClient } from "@/components/brainstorming/WhatsAppImportClient";
-import { getBrainstormingSessions } from "@/lib/brainstorming";
+import { getBrainstormingSessionsWithDailyEnsure } from "@/lib/brainstorming";
 
 export const dynamic = "force-dynamic";
 
 export default async function BrainstormingImportPage() {
-  const sessions = await getBrainstormingSessions();
+  const sessions = await getBrainstormingSessionsWithDailyEnsure();
   return (
     <div className="space-y-5">
       <div>

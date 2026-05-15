@@ -1,12 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createBrainstormingSession, getBrainstormingSessions, updateBrainstormingSession } from "@/lib/brainstorming";
+import {
+  createBrainstormingSession,
+  getBrainstormingSessionsWithDailyEnsure,
+  updateBrainstormingSession
+} from "@/lib/brainstorming";
 import { getCurrentUserContext, isAdmin } from "@/lib/serverAuth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    return NextResponse.json({ sessions: await getBrainstormingSessions() });
+    return NextResponse.json({ sessions: await getBrainstormingSessionsWithDailyEnsure() });
   } catch (error) {
     return NextResponse.json({ error: getErrorMessage(error) }, { status: 400 });
   }
