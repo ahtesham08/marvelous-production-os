@@ -22,6 +22,10 @@ export type BrainstormingSessionInput = {
   status?: string;
 };
 
+const defaultSessionChannels = [...FRESH_START_CHANNELS];
+const defaultSessionParticipants = ["Ahtesham", "Kamran", "Farhan", "Raktim"];
+const sessionTimezone = "Asia/Kolkata";
+
 export type BrainstormingTitleInput = {
   sessionId?: string | null;
   title: string;
@@ -119,6 +123,33 @@ export async function createBrainstormingSession(input: BrainstormingSessionInpu
   return data as BrainstormingSession;
 }
 
+export async function ensureDailyBrainstormingSession(date = new Date()) {
+  const today = getSessionDateParts(date);
+  if (today.weekday === "Sunday") {
+    return { created: false, skipped: true, reason: "Sunday", session: null };
+  }
+
+  const existing = (await getBrainstormingSessions()).find(
+    (session) => session.session_date === today.date && session.status !== "Archived"
+  );
+  if (existing) {
+    return { created: false, skipped: false, reason: "Already exists", session: existing };
+  }
+
+  const session = await createBrainstormingSession(
+    {
+      name: `Brainstorming ${today.date}`,
+      sessionDate: today.date,
+      channels: defaultSessionChannels,
+      participants: defaultSessionParticipants,
+      notes: "Auto-created daily brainstorming session.",
+      status: "Draft"
+    },
+    null
+  );
+  return { created: true, skipped: false, reason: "Created", session };
+}
+
 export async function updateBrainstormingSessionStatus(sessionId: string, status: string) {
   const now = new Date().toISOString();
   if (!hasSupabaseAdminConfig()) {
@@ -131,6 +162,39 @@ export async function updateBrainstormingSessionStatus(sessionId: string, status
   const supabase = createSupabaseAdminClient();
   const { error } = await supabase.from("brainstorming_sessions").update({ status, updated_at: now }).eq("id", sessionId);
   if (error) throw error;
+}
+
+export async function updateBrainstormingSession(sessionId: string, input: Partial<BrainstormingSessionInput>) {
+  const existing = await getBrainstormingSession(sessionId);
+  if (!existing) throw new Error("Brainstorming session not found.");
+
+  const now = new Date().toISOString();
+  const patch = {
+    name: clean(input.name) ?? existing.name,
+    session_date: normalizeDate(input.sessionDate) ?? existing.session_date,
+    channels: input.channels ? normalizeList(input.channels) : existing.channels,
+    participants: input.participants ? normalizeList(input.participants) : existing.participants,
+    notes: clean(input.notes) ?? existing.notes,
+    status: clean(input.status) ?? existing.status,
+    updated_at: now
+  };
+
+  if (!hasSupabaseAdminConfig()) {
+    const store = await readBrainstormingStore();
+    store.sessions = store.sessions.map((session) => (session.id === sessionId ? { ...session, ...patch } : session));
+    await writeBrainstormingStore(store);
+    return store.sessions.find((session) => session.id === sessionId) ?? null;
+  }
+
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("brainstorming_sessions")
+    .update(patch)
+    .eq("id", sessionId)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as BrainstormingSession;
 }
 
 export async function getBrainstormingTitles(options: { sessionId?: string; status?: string } = {}) {
@@ -540,6 +604,24 @@ function normalizeDate(value: string | null | undefined) {
   const cleaned = clean(value);
   if (!cleaned) return null;
   return /^\d{4}-\d{2}-\d{2}$/.test(cleaned) ? cleaned : null;
+}
+
+function getSessionDateParts(date: Date) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: sessionTimezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      weekday: "long"
+    })
+      .formatToParts(date)
+      .map((part) => [part.type, part.value])
+  );
+  return {
+    date: `${parts.year}-${parts.month}-${parts.day}`,
+    weekday: parts.weekday
+  };
 }
 
 function normalizeList(values: string[]) {

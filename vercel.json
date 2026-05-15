@@ -1,4 +1,10 @@
 {
   "framework": "nextjs",
-  "buildCommand": "npm run build"
+  "buildCommand": "npm run build",
+  "crons": [
+    {
+      "path": "/api/cron/brainstorming-session",
+      "schedule": "30 18 * * 0-5"
+    }
+  ]
 }

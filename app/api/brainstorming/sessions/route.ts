@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createBrainstormingSession, getBrainstormingSessions } from "@/lib/brainstorming";
+import { createBrainstormingSession, getBrainstormingSessions, updateBrainstormingSession } from "@/lib/brainstorming";
 import { getCurrentUserContext, isAdmin } from "@/lib/serverAuth";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +18,20 @@ export async function POST(request: NextRequest) {
 
   try {
     const session = await createBrainstormingSession(await request.json(), context.user);
+    return NextResponse.json({ session });
+  } catch (error) {
+    return NextResponse.json({ error: getErrorMessage(error) }, { status: 400 });
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  const context = await getCurrentUserContext();
+  if (!isAdmin(context.user?.role)) return NextResponse.json({ error: "Only Admin can edit sessions." }, { status: 403 });
+
+  try {
+    const payload = await request.json();
+    if (!payload.id) return NextResponse.json({ error: "Session id is required." }, { status: 400 });
+    const session = await updateBrainstormingSession(payload.id, payload);
     return NextResponse.json({ session });
   } catch (error) {
     return NextResponse.json({ error: getErrorMessage(error) }, { status: 400 });

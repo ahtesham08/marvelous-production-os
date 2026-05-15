@@ -319,6 +319,12 @@ SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
 GOOGLE_SHEETS_WRITEBACK_MODE=disabled
 ```
 
+Optional:
+
+```bash
+CRON_SECRET=your-random-cron-secret
+```
+
 Optional, only for old archive import:
 
 ```bash
@@ -335,6 +341,8 @@ GOOGLE_PRIVATE_KEY=
    - `002_mvp2_workflow_fields.sql`
    - `003_fresh_start_mode.sql`
    - `004_mvp3_team_rollout.sql`
+   - `005_brainstorming_module.sql`
+   - `006_brainstorming_approval_controls.sql`
 4. Go to Authentication > Providers.
 5. Enable Google provider.
 6. Add Google OAuth Client ID and Client Secret.
@@ -374,6 +382,7 @@ Your account is not approved. Ask Admin to add your email.
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY`
    - `GOOGLE_SHEETS_WRITEBACK_MODE=disabled`
+   - `CRON_SECRET` optional, for protecting the daily brainstorming cron endpoint
 6. Deploy.
 7. Copy the Vercel production URL.
 8. Add it to Supabase Auth redirect URLs.
@@ -382,6 +391,21 @@ Your account is not approved. Ask Admin to add your email.
 11. Test login as Ahtesham.
 12. Test login as Kamran/Farhan/Raktim.
 13. Share the production URL with the team.
+
+## Automatic Daily Brainstorming Sessions
+
+Vercel runs `/api/cron/brainstorming-session` at `00:00 Asia/Kolkata`, Monday through Saturday. The cron schedule is stored in `vercel.json` as `30 18 * * 0-5`, which is midnight India time after UTC conversion.
+
+The job is safe to run more than once. If a non-archived session already exists for that India date, it returns the existing session instead of creating a duplicate. Sundays are skipped.
+
+Default auto-created sessions use:
+
+- Name: `Brainstorming YYYY-MM-DD`
+- Channels: `MV N`, `LL`, `Gamers`, `Anime`, `Long Reads`
+- Participants: `Ahtesham`, `Kamran`, `Farhan`, `Raktim`
+- Status: `Draft`
+
+Admins can rename a session from Live Review Mode using the `Save Name` control at the top of the session.
 
 ## Production Launch Checklist Page
 

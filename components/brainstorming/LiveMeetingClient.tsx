@@ -10,13 +10,18 @@ import type { BrainstormingSession, BrainstormingTitle } from "@/lib/types";
 export function LiveMeetingClient({ session, titles, canDecide }: { session: BrainstormingSession; titles: BrainstormingTitle[]; canDecide: boolean }) {
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [localSession, setLocalSession] = useState(session);
+  const [sessionName, setSessionName] = useState(session.name);
+  const [renaming, setRenaming] = useState(false);
   const [localTitles, setLocalTitles] = useState(titles);
   const [approvalSettings, setApprovalSettings] = useState(() => buildApprovalSettings(titles));
 
   useEffect(() => {
+    setLocalSession(session);
+    setSessionName(session.name);
     setLocalTitles(titles);
     setApprovalSettings((current) => ({ ...buildApprovalSettings(titles), ...current }));
-  }, [titles]);
+  }, [session, titles]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, BrainstormingTitle[]>();
@@ -26,7 +31,7 @@ export function LiveMeetingClient({ session, titles, canDecide }: { session: Bra
     }
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [localTitles]);
-  const report = buildBrainstormingReport(session, localTitles);
+  const report = buildBrainstormingReport(localSession, localTitles);
 
   async function patchTitle(id: string, body: Record<string, unknown>) {
     setBusyId(id);
@@ -61,6 +66,25 @@ export function LiveMeetingClient({ session, titles, canDecide }: { session: Bra
     await navigator.clipboard.writeText(report);
   }
 
+  async function saveSessionName() {
+    const nextName = sessionName.trim();
+    if (!nextName) return;
+    setRenaming(true);
+    const response = await fetch("/api/brainstorming/sessions", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: localSession.id, name: nextName })
+    });
+    const payload = await response.json();
+    setRenaming(false);
+    if (!response.ok) {
+      alert(payload.error || "Could not rename session.");
+      return;
+    }
+    setLocalSession(payload.session);
+    setSessionName(payload.session.name);
+  }
+
   function updateApprovalSetting(id: string, patch: Partial<ApprovalSetting>) {
     setApprovalSettings((current) => ({
       ...current,
@@ -81,15 +105,35 @@ export function LiveMeetingClient({ session, titles, canDecide }: { session: Bra
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-xl font-semibold text-ink">{session.name}</h2>
-              <BrainstormingStatusBadge status={session.status} />
+              <h2 className="text-xl font-semibold text-ink">{localSession.name}</h2>
+              <BrainstormingStatusBadge status={localSession.status} />
             </div>
-            <p className="mt-1 text-sm text-black/60">{session.session_date} | {(session.participants ?? []).join(", ") || "No participants listed"}</p>
+            <p className="mt-1 text-sm text-black/60">{localSession.session_date} | {(localSession.participants ?? []).join(", ") || "No participants listed"}</p>
           </div>
-          <button type="button" onClick={copyReport} className="focus-ring inline-flex items-center gap-2 rounded-md border border-black/10 px-3 py-2 text-sm font-semibold text-moss hover:border-moss">
-            <Copy size={16} />
-            Copy Session Report
-          </button>
+          <div className="flex flex-col gap-2 sm:min-w-[360px]">
+            {canDecide ? (
+              <div className="flex gap-2">
+                <input
+                  className="field-input"
+                  value={sessionName}
+                  onChange={(event) => setSessionName(event.target.value)}
+                  aria-label="Session name"
+                />
+                <button
+                  type="button"
+                  onClick={saveSessionName}
+                  disabled={renaming || sessionName.trim() === localSession.name}
+                  className="focus-ring whitespace-nowrap rounded-md bg-ink px-3 py-2 text-sm font-semibold text-white hover:bg-moss disabled:opacity-60"
+                >
+                  {renaming ? "Saving" : "Save Name"}
+                </button>
+              </div>
+            ) : null}
+            <button type="button" onClick={copyReport} className="focus-ring inline-flex items-center justify-center gap-2 rounded-md border border-black/10 px-3 py-2 text-sm font-semibold text-moss hover:border-moss">
+              <Copy size={16} />
+              Copy Session Report
+            </button>
+          </div>
         </div>
       </section>
 
