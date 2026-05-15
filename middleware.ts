@@ -15,6 +15,11 @@ export async function middleware(request: NextRequest) {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const pathname = request.nextUrl.pathname;
   const isPublicPath = publicPaths.some((path) => pathname.startsWith(path));
+  const isCronPath = pathname.startsWith("/api/cron/");
+
+  if (isCronPath) {
+    return NextResponse.next();
+  }
 
   if (appMode !== "production" && !supabaseUrl) {
     return NextResponse.next();
