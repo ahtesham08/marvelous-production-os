@@ -8,8 +8,15 @@ import { getDashboardData } from "@/lib/dashboardData";
 
 export const dynamic = "force-dynamic";
 
-export default async function TitleDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function TitleDetailPage({
+  params,
+  searchParams
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ return?: string }>;
+}) {
   const { id } = await params;
+  const { return: returnPath } = await searchParams;
   const data = await getDashboardData();
   const title = data.titles.find((item) => item.id === id);
 
@@ -18,7 +25,7 @@ export default async function TitleDetailPage({ params }: { params: Promise<{ id
   return (
     <div className="space-y-5">
       <section className="rounded-lg border border-black/10 bg-white p-5 shadow-soft">
-        <Link href="/titles" className="text-sm font-semibold text-moss hover:underline">
+        <Link href={returnPath || "/titles"} className="text-sm font-semibold text-moss hover:underline">
           Back to titles
         </Link>
         <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -40,6 +47,8 @@ export default async function TitleDetailPage({ params }: { params: Promise<{ id
             <Info label="Writer" value={title.writer} />
             <Info label="Age" value={`${title.ageDays} days`} />
             <Info label="Due Date" value={title.writerDueDate || "Missing"} />
+            <Info label="Expected Word Count" value={title.expectedWordCount ? `${title.expectedWordCount}` : "Missing"} />
+            <Info label="Actual Word Count" value={title.wordCount ? `${title.wordCount}` : "Missing"} />
             <Info label="Source Row" value={title.sourceRow} />
             <Info label="Production Row" value={title.productionRow} />
           </div>
@@ -61,6 +70,12 @@ export default async function TitleDetailPage({ params }: { params: Promise<{ id
                 {title.blockedCategory || "Other"} | {title.blockedBy || title.supervisor}
               </p>
             ) : null}
+          </section>
+          <section className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
+            <h2 className="text-lg font-semibold text-ink">Ahtesham's Directives</h2>
+            <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-black/70">
+              {title.ahteshamDirectives || "No directives added yet."}
+            </p>
           </section>
           <section className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
             <h2 className="text-lg font-semibold text-ink">Activity Timeline</h2>

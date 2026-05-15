@@ -14,7 +14,7 @@ export default async function LiveBrainstormingPage({ params }: PageProps) {
   const { sessionId } = await params;
   const [session, titles, context] = await Promise.all([
     getBrainstormingSession(sessionId),
-    getBrainstormingTitles({ sessionId }),
+    getBrainstormingTitles({ sessionId, includeResurfaced: true }),
     getCurrentUserContext()
   ]);
   if (!session) notFound();
@@ -32,7 +32,12 @@ export default async function LiveBrainstormingPage({ params }: PageProps) {
           <Link href="/brainstorming/import" className="rounded-md border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-moss hover:border-moss">Import Paste</Link>
         </div>
       </div>
-      <LiveMeetingClient session={session} titles={titles} canDecide={isAdmin(context.user?.role)} />
+      <LiveMeetingClient
+        session={session}
+        titles={titles}
+        canDecide={isAdmin(context.user?.role)}
+        canEdit={["Admin", "Supervisor"].includes(String(context.user?.role))}
+      />
     </div>
   );
 }

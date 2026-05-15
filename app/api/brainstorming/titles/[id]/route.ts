@@ -4,6 +4,7 @@ import {
   convertBrainstormingTitle,
   decideBrainstormingTitle,
   getBrainstormingTitle,
+  updateBrainstormingTitleApprovalFields,
   updateBrainstormingProposal,
   updateBrainstormingTitleNotes
 } from "@/lib/brainstorming";
@@ -23,10 +24,34 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
     if (payload.action === "decision") {
       if (!isAdmin(userContext.user?.role)) return NextResponse.json({ error: "Only Admin can decide titles." }, { status: 403 });
+      if (payload.titleText) {
+        await updateBrainstormingProposal(id, { title: payload.titleText });
+      }
+      if (payload.directives !== undefined) {
+        await updateBrainstormingTitleNotes(id, payload.directives, payload.discussionSummary);
+      }
       await decideBrainstormingTitle(id, payload.decision, payload.reason, userContext.user, {
         urgency: payload.urgency,
         dueDate: payload.dueDate
       });
+      if (payload.expectedWordCount !== undefined || payload.holdUntilDate !== undefined) {
+        await updateBrainstormingTitleApprovalFields(id, {
+          urgency: payload.urgency,
+          dueDate: payload.dueDate,
+          expectedWordCount: payload.expectedWordCount,
+          holdUntilDate: payload.holdUntilDate
+        });
+      }
+      if (payload.decision === "Approve") {
+        const title = await convertBrainstormingTitle(id, userContext.user);
+        return NextResponse.json({ ok: true, title, brainstormingTitle: await getBrainstormingTitle(id) });
+      }
+      return NextResponse.json({ ok: true, title: await getBrainstormingTitle(id) });
+    }
+
+    if (payload.action === "approval-fields") {
+      if (!isAdmin(userContext.user?.role)) return NextResponse.json({ error: "Only Admin can edit approval fields." }, { status: 403 });
+      await updateBrainstormingTitleApprovalFields(id, payload);
       return NextResponse.json({ ok: true, title: await getBrainstormingTitle(id) });
     }
 

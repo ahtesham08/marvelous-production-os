@@ -33,6 +33,8 @@ export type BrainstormingTitleInput = {
   priority?: string | null;
   urgency?: string | null;
   dueDate?: string | null;
+  expectedWordCount?: number | string | null;
+  holdUntilDate?: string | null;
   supervisor?: string | null;
   shortPitch?: string | null;
   whyGood?: string | null;
@@ -197,11 +199,16 @@ export async function updateBrainstormingSession(sessionId: string, input: Parti
   return data as BrainstormingSession;
 }
 
-export async function getBrainstormingTitles(options: { sessionId?: string; status?: string } = {}) {
+export async function getBrainstormingTitles(options: { sessionId?: string; status?: string; includeResurfaced?: boolean } = {}) {
+  const today = getSessionDateParts(new Date()).date;
   if (!hasSupabaseAdminConfig()) {
     const store = await readBrainstormingStore();
     return attachNotes(store.titles, store.notes)
-      .filter((title) => !options.sessionId || title.session_id === options.sessionId)
+      .filter((title) => {
+        if (!options.sessionId) return true;
+        if (title.session_id === options.sessionId) return true;
+        return Boolean(options.includeResurfaced && title.status === "Hold" && title.hold_until_date && title.hold_until_date <= today);
+      })
       .filter((title) => !options.status || title.status === options.status)
       .sort(sortTitles);
   }
@@ -211,12 +218,17 @@ export async function getBrainstormingTitles(options: { sessionId?: string; stat
     .from("brainstorming_titles")
     .select("*, brainstorming_discussion_notes(*)")
     .order("created_at", { ascending: false });
-  if (options.sessionId) query = query.eq("session_id", options.sessionId);
+  if (options.sessionId && !options.includeResurfaced) query = query.eq("session_id", options.sessionId);
   if (options.status) query = query.eq("status", options.status);
   const { data, error } = await query;
   if (error && isMissingBrainstormingTable(error)) return [];
   if (error) throw error;
-  return (data ?? []) as BrainstormingTitle[];
+  return ((data ?? []) as BrainstormingTitle[])
+    .filter((title) => {
+      if (!options.sessionId) return true;
+      if (title.session_id === options.sessionId) return true;
+      return Boolean(options.includeResurfaced && title.status === "Hold" && title.hold_until_date && title.hold_until_date <= today);
+    });
 }
 
 export async function getBrainstormingTitle(titleId: string) {
@@ -255,6 +267,8 @@ export async function createBrainstormingTitles(inputs: BrainstormingTitleInput[
       priority: input.priority,
       urgency: input.urgency,
       approved_due_date: input.dueDate,
+      expected_word_count: input.expectedWordCount,
+      hold_until_date: input.holdUntilDate,
       submitted_by: user?.id?.startsWith("demo-") ? null : user?.id ?? null,
       submitted_by_name: user?.name ?? input.supervisor,
       supervisor: input.supervisor || user?.name || null,
@@ -342,6 +356,31 @@ export async function decideBrainstormingTitle(
   if (error) throw error;
 }
 
+export async function updateBrainstormingTitleApprovalFields(
+  titleId: string,
+  input: { urgency?: string | null; dueDate?: string | null; expectedWordCount?: unknown; holdUntilDate?: string | null }
+) {
+  const now = new Date().toISOString();
+  const patch = {
+    ...(input.urgency !== undefined ? { urgency: normalizePriority(input.urgency), priority: normalizePriority(input.urgency) } : {}),
+    ...(input.dueDate !== undefined ? { approved_due_date: normalizeDate(input.dueDate) } : {}),
+    ...(input.expectedWordCount !== undefined ? { expected_word_count: normalizeWordCount(input.expectedWordCount) } : {}),
+    ...(input.holdUntilDate !== undefined ? { hold_until_date: normalizeDate(input.holdUntilDate) } : {}),
+    updated_at: now
+  };
+
+  if (!hasSupabaseAdminConfig()) {
+    const store = await readBrainstormingStore();
+    store.titles = store.titles.map((title) => (title.id === titleId ? { ...title, ...patch } : title));
+    await writeBrainstormingStore(store);
+    return;
+  }
+
+  const supabase = createSupabaseAdminClient();
+  const { error } = await supabase.from("brainstorming_titles").update(patch).eq("id", titleId);
+  if (error) throw error;
+}
+
 export async function addBrainstormingNote(titleId: string, noteText: string, user: UserRecord | null) {
   const text = clean(noteText);
   if (!text) throw new Error("Add a note first.");
@@ -384,7 +423,6 @@ export async function updateBrainstormingTitleNotes(titleId: string, ahteshamNot
 export async function updateBrainstormingProposal(titleId: string, input: Partial<BrainstormingTitleInput>) {
   const existing = await getBrainstormingTitle(titleId);
   if (!existing) throw new Error("Brainstorming title not found.");
-  if (existing.status !== "Proposed") throw new Error("Only proposed titles can be edited before a decision.");
 
   const now = new Date().toISOString();
   const normalized = input.title ? normalizeTitle(input.title) : existing.normalized_title;
@@ -398,6 +436,8 @@ export async function updateBrainstormingProposal(titleId: string, input: Partia
     reference_links: clean(input.referenceLinks) ?? existing.reference_links,
     suggested_writer: clean(input.suggestedWriter) ?? existing.suggested_writer,
     notes: clean(input.notes) ?? existing.notes,
+    expected_word_count:
+      input.expectedWordCount !== undefined ? normalizeWordCount(input.expectedWordCount) : existing.expected_word_count,
     updated_at: now
   };
 
@@ -411,6 +451,20 @@ export async function updateBrainstormingProposal(titleId: string, input: Partia
   const supabase = createSupabaseAdminClient();
   const { error } = await supabase.from("brainstorming_titles").update(patch).eq("id", titleId);
   if (error) throw error;
+
+  if (existing.converted_title_id && input.title) {
+    const { error: titleError } = await supabase
+      .from("titles")
+      .update({ title: patch.title, normalized_title: patch.normalized_title, updated_at: now })
+      .eq("id", existing.converted_title_id);
+    if (titleError) throw titleError;
+    await supabase.from("activity_log").insert({
+      title_id: existing.converted_title_id,
+      action: "Updated title",
+      old_value: existing.title,
+      new_value: patch.title
+    });
+  }
 }
 
 export async function convertBrainstormingTitle(titleId: string, user: UserRecord | null) {
@@ -451,7 +505,9 @@ export async function convertBrainstormingTitle(titleId: string, user: UserRecor
       imported_supervisor_name: title.supervisor || title.submitted_by_name,
       imported_writer_name: title.suggested_writer,
       writer_due_date: title.approved_due_date,
-      notes: title.ahtesham_notes || title.notes,
+      expected_word_count: title.expected_word_count,
+      ahtesham_directives: title.ahtesham_notes,
+      notes: title.notes,
       current_status: "Approved",
       match_status: "Fresh Start",
       created_at: now,
@@ -532,6 +588,8 @@ function normalizeBrainstormingInput(input: BrainstormingTitleInput) {
     priority: normalizePriority(input.priority),
     urgency: normalizePriority(input.urgency || input.priority),
     dueDate: normalizeDate(input.dueDate),
+    expectedWordCount: normalizeWordCount(input.expectedWordCount),
+    holdUntilDate: normalizeDate(input.holdUntilDate),
     supervisor: clean(input.supervisor),
     shortPitch: clean(input.shortPitch),
     whyGood: clean(input.whyGood),
@@ -556,6 +614,8 @@ function toLocalBrainstormingTitle(
     priority: input.priority,
     urgency: input.urgency,
     approved_due_date: input.dueDate,
+    expected_word_count: input.expectedWordCount,
+    hold_until_date: input.holdUntilDate,
     submitted_by: null,
     submitted_by_name: user?.name ?? input.supervisor,
     supervisor: input.supervisor || user?.name || null,
@@ -604,6 +664,12 @@ function normalizeDate(value: string | null | undefined) {
   const cleaned = clean(value);
   if (!cleaned) return null;
   return /^\d{4}-\d{2}-\d{2}$/.test(cleaned) ? cleaned : null;
+}
+
+function normalizeWordCount(value: unknown) {
+  if (value === null || value === undefined || value === "") return null;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric >= 0 ? Math.round(numeric) : null;
 }
 
 function getSessionDateParts(date: Date) {

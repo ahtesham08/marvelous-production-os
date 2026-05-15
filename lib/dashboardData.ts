@@ -166,7 +166,9 @@ function enrichTitle(record: TitleRecord): EnrichedTitle {
     writer,
     status,
     priority: record.priority || "Normal",
+    expectedWordCount: record.expected_word_count ?? null,
     approvedDate: record.approved_date,
+    createdDate: record.created_at ? record.created_at.slice(0, 10) : null,
     ageDays,
     ageBucket: getAgeBucket(ageDays),
     missingFields,
@@ -196,6 +198,7 @@ function enrichTitle(record: TitleRecord): EnrichedTitle {
     blockedCategory: record.blocked_category,
     completedAt: record.completed_at,
     notes: record.notes,
+    ahteshamDirectives: record.ahtesham_directives,
     sheetWriteBackStatus: record.sheet_write_back_status,
     sheetWriteBackAt: record.sheet_write_back_at,
     activityLog: (record.activity_log ?? []).sort((a, b) => {

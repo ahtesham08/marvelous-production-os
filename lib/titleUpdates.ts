@@ -3,11 +3,15 @@ import { isProductionMode } from "@/lib/appMode";
 import { getLocalTitleRecord, updateLocalTitleRecord } from "@/lib/localStore";
 import { STATUS_VALUES } from "@/lib/statusRules";
 import { createSupabaseAdminClient, hasSupabaseAdminConfig } from "@/lib/supabaseServer";
+import { normalizeTitle } from "@/lib/titleNormalizer";
 import type { ProductionDetail, TitleRecord } from "@/lib/types";
 
 export type TitleUpdatePayload = {
+  title?: string | null;
   imported_supervisor_name?: string | null;
   imported_writer_name?: string | null;
+  expected_word_count?: number | string | null;
+  ahtesham_directives?: string | null;
   help_doc_url?: string | null;
   script_doc_url?: string | null;
   writer_due_date?: string | null;
@@ -213,8 +217,17 @@ function buildTitlePatch(
 ) {
   const patch: Partial<TitleRecord> = {};
 
+  if ("title" in payload) {
+    const nextTitle = normalizeString(payload.title);
+    if (nextTitle) {
+      patch.title = nextTitle;
+      patch.normalized_title = normalizeTitle(nextTitle);
+    }
+  }
   if ("imported_supervisor_name" in payload) patch.imported_supervisor_name = normalizeString(payload.imported_supervisor_name);
   if ("imported_writer_name" in payload) patch.imported_writer_name = normalizeString(payload.imported_writer_name);
+  if ("expected_word_count" in payload) patch.expected_word_count = normalizeWordCount(payload.expected_word_count);
+  if ("ahtesham_directives" in payload) patch.ahtesham_directives = normalizeString(payload.ahtesham_directives);
   if ("help_doc_url" in payload) patch.help_doc_url = normalizeString(payload.help_doc_url);
   if ("script_doc_url" in payload) patch.script_doc_url = normalizeString(payload.script_doc_url);
   if ("writer_due_date" in payload) patch.writer_due_date = normalizeString(payload.writer_due_date);

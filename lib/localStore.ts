@@ -77,6 +77,8 @@ export async function createLocalFreshTitles(inputs: LocalFreshInput[]) {
       approved_date: approvedDate,
       imported_supervisor_name: input.supervisor,
       imported_writer_name: input.writer,
+      expected_word_count: null,
+      ahtesham_directives: null,
       help_doc_url: input.helpDocUrl,
       script_doc_url: null,
       writer_due_date: input.dueDate,

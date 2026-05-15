@@ -407,6 +407,14 @@ Default auto-created sessions use:
 
 Admins can rename a session from Live Review Mode using the `Save Name` control at the top of the session.
 
+## Live Review And Production Workflow Updates
+
+- The Main Title Table supports date filters for today, yesterday, current week, last week, and custom date ranges. These filters work with supervisor, channel, status, priority, and search filters, and the selected filters persist when opening a title and returning.
+- Live Review Mode supports expected word count, due date, urgency, editable title text, supervisor filtering, and Ahtesham's directives.
+- Clicking `Approve` in Live Review Mode now creates the production title immediately and prevents duplicate conversion if the title already has a production record.
+- Titles put on `Hold` can have a hold-until date. Future-held titles stay out of the active review list until that date, then return with a `Resurfaced From Hold` highlight.
+- Production title detail pages show expected word count separately from Deepak's actual word count, and show Ahtesham's directives in a dedicated editable section.
+
 ## Production Launch Checklist Page
 
 Open:
@@ -475,9 +483,9 @@ Admin workflow:
 1. Create a session from `/brainstorming/sessions/new`.
 2. Ask supervisors to submit titles or paste WhatsApp lists into `/brainstorming/import`.
 3. Open `/brainstorming/live/[sessionId]` during the meeting.
-4. Approve, reject, hold, or mark titles as needing better angle/research.
-5. For approved titles, click `Create Production Title`.
-6. The approved idea becomes a normal title in the existing production dashboard.
+4. Set due date, urgency, expected word count, and Ahtesham's directives as needed.
+5. Approve, reject, hold, or mark titles as needing better angle/research.
+6. Approved ideas automatically become normal titles in the existing production dashboard.
 
 Supervisor workflow:
 

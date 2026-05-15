@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { FiltersBar } from "@/components/FiltersBar";
 import { MissingFieldsBadge } from "@/components/MissingFieldsBadge";
 import { SeverityBadge } from "@/components/SeverityBadge";
@@ -21,9 +22,17 @@ export function TitleTable({
   initialChannel = "All",
   rottingOnly = false
 }: TitleTableProps) {
-  const [search, setSearch] = useState("");
-  const [supervisor, setSupervisor] = useState(initialSupervisor);
-  const [channel, setChannel] = useState(initialChannel);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [search, setSearch] = usePersistentFilter("q", "", searchParams);
+  const [supervisor, setSupervisor] = usePersistentFilter("supervisor", initialSupervisor, searchParams);
+  const [channel, setChannel] = usePersistentFilter("channel", initialChannel, searchParams);
+  const [status, setStatus] = usePersistentFilter("status", "All", searchParams);
+  const [priority, setPriority] = usePersistentFilter("priority", "All", searchParams);
+  const [dateFilter, setDateFilter] = usePersistentFilter("date", "All", searchParams);
+  const [customStart, setCustomStart] = usePersistentFilter("start", "", searchParams);
+  const [customEnd, setCustomEnd] = usePersistentFilter("end", "", searchParams);
 
   const supervisors = useMemo(
     () =>
@@ -36,10 +45,18 @@ export function TitleTable({
 
   const filteredTitles = useMemo(() => {
     const query = search.trim().toLowerCase();
+    const range = getDateRange(dateFilter, customStart, customEnd);
     return titles
       .filter((title) => !rottingOnly || title.severity === "Critical" || title.ageDays >= 8 || title.matchStatus === "Not Migrated")
       .filter((title) => supervisor === "All" || title.supervisor === supervisor)
       .filter((title) => channel === "All" || title.channel === channel)
+      .filter((title) => status === "All" || title.status === status)
+      .filter((title) => priority === "All" || title.priority === priority)
+      .filter((title) => {
+        if (!range) return true;
+        const value = title.approvedDate || title.createdDate;
+        return Boolean(value && value >= range.start && value <= range.end);
+      })
       .filter((title) => {
         if (!query) return true;
         return [
@@ -56,7 +73,25 @@ export function TitleTable({
           .includes(query);
       })
       .sort((a, b) => b.ageDays - a.ageDays);
-  }, [channel, rottingOnly, search, supervisor, titles]);
+  }, [channel, customEnd, customStart, dateFilter, priority, rottingOnly, search, status, supervisor, titles]);
+
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams.toString());
+    updateParam(next, "q", search, "");
+    updateParam(next, "supervisor", supervisor, initialSupervisor);
+    updateParam(next, "channel", channel, initialChannel);
+    updateParam(next, "status", status, "All");
+    updateParam(next, "priority", priority, "All");
+    updateParam(next, "date", dateFilter, "All");
+    updateParam(next, "start", customStart, "");
+    updateParam(next, "end", customEnd, "");
+    const query = next.toString();
+    const nextUrl = query ? `${pathname}?${query}` : pathname;
+    const currentUrl = searchParams.toString() ? `${pathname}?${searchParams}` : pathname;
+    if (nextUrl !== currentUrl) router.replace(nextUrl, { scroll: false });
+  }, [channel, customEnd, customStart, dateFilter, initialChannel, initialSupervisor, pathname, priority, router, search, searchParams, status, supervisor]);
+
+  const returnPath = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
 
   return (
     <div className="space-y-3">
@@ -68,6 +103,16 @@ export function TitleTable({
         search={search}
         onChannelChange={setChannel}
         onSupervisorChange={setSupervisor}
+        status={status}
+        priority={priority}
+        dateFilter={dateFilter}
+        customStart={customStart}
+        customEnd={customEnd}
+        onStatusChange={setStatus}
+        onPriorityChange={setPriority}
+        onDateFilterChange={setDateFilter}
+        onCustomStartChange={setCustomStart}
+        onCustomEndChange={setCustomEnd}
         onSearchChange={setSearch}
       />
 
@@ -91,7 +136,7 @@ export function TitleTable({
               {filteredTitles.map((title) => (
                 <tr key={title.id} className="align-top hover:bg-[#faf9f5]">
                   <td className="max-w-sm px-4 py-3 font-medium text-ink">
-                    <Link href={`/titles/${title.id}`} className="transition hover:text-moss hover:underline">
+                    <Link href={`/titles/${title.id}?return=${encodeURIComponent(returnPath)}`} className="transition hover:text-moss hover:underline">
                       {title.title}
                     </Link>
                     {title.blocked ? <div className="mt-1 text-xs font-semibold text-danger">Blocked</div> : null}
@@ -124,4 +169,65 @@ export function TitleTable({
       </div>
     </div>
   );
+}
+
+function usePersistentFilter(key: string, fallback: string, searchParams: ReturnType<typeof useSearchParams>) {
+  const storageKey = `marvelous-title-table-${key}`;
+  const initial = searchParams.get(key) || fallback;
+  const [value, setValue] = useState(initial);
+  useEffect(() => {
+    if (searchParams.get(key)) return;
+    const stored = window.localStorage.getItem(storageKey);
+    if (stored) setValue(stored);
+  }, [key, searchParams, storageKey]);
+  useEffect(() => {
+    window.localStorage.setItem(storageKey, value);
+  }, [storageKey, value]);
+  return [value, setValue] as const;
+}
+
+function updateParam(params: URLSearchParams, key: string, value: string, fallback: string) {
+  if (!value || value === fallback) params.delete(key);
+  else params.set(key, value);
+}
+
+function getDateRange(filter: string, customStart: string, customEnd: string) {
+  const today = startOfDay(new Date());
+  if (filter === "today") return singleDate(today);
+  if (filter === "yesterday") {
+    const yesterday = addDays(today, -1);
+    return singleDate(yesterday);
+  }
+  if (filter === "current-week") {
+    const start = addDays(today, -today.getDay());
+    return { start: toDateKey(start), end: toDateKey(addDays(start, 6)) };
+  }
+  if (filter === "last-week") {
+    const currentStart = addDays(today, -today.getDay());
+    const start = addDays(currentStart, -7);
+    return { start: toDateKey(start), end: toDateKey(addDays(start, 6)) };
+  }
+  if (filter === "custom" && customStart && customEnd) return { start: customStart, end: customEnd };
+  return null;
+}
+
+function singleDate(date: Date) {
+  const key = toDateKey(date);
+  return { start: key, end: key };
+}
+
+function startOfDay(date: Date) {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function toDateKey(date: Date) {
+  return date.toISOString().slice(0, 10);
 }

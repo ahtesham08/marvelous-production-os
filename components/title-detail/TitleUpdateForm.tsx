@@ -13,8 +13,11 @@ type TitleUpdateFormProps = {
 export function TitleUpdateForm({ title }: TitleUpdateFormProps) {
   const router = useRouter();
   const [form, setForm] = useState({
+    titleText: title.title,
     supervisor: title.supervisor === "Missing" ? "" : title.supervisor,
     writer: title.writer === "Missing" ? "" : title.writer,
+    expectedWordCount: title.expectedWordCount?.toString() ?? "",
+    ahteshamDirectives: title.ahteshamDirectives ?? "",
     helpDocUrl: title.helpDocUrl ?? "",
     scriptDocUrl: title.scriptDocUrl ?? "",
     writerDueDate: title.writerDueDate ?? "",
@@ -47,8 +50,11 @@ export function TitleUpdateForm({ title }: TitleUpdateFormProps) {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        title: form.titleText,
         imported_supervisor_name: form.supervisor,
         imported_writer_name: form.writer,
+        expected_word_count: form.expectedWordCount ? Number(form.expectedWordCount) : null,
+        ahtesham_directives: form.ahteshamDirectives,
         help_doc_url: form.helpDocUrl,
         script_doc_url: form.scriptDocUrl,
         writer_due_date: form.writerDueDate,
@@ -102,6 +108,14 @@ export function TitleUpdateForm({ title }: TitleUpdateFormProps) {
       </div>
 
       <div className="mt-5 grid gap-4 md:grid-cols-2">
+        <Field label="Title">
+          <input
+            suppressHydrationWarning
+            className="field-input"
+            value={form.titleText}
+            onChange={(event) => updateField("titleText", event.target.value)}
+          />
+        </Field>
         <Field label="Supervisor">
           <input
             suppressHydrationWarning
@@ -125,6 +139,16 @@ export function TitleUpdateForm({ title }: TitleUpdateFormProps) {
             className="field-input"
             value={form.writerDueDate}
             onChange={(event) => updateField("writerDueDate", event.target.value)}
+          />
+        </Field>
+        <Field label="Expected Word Count">
+          <input
+            suppressHydrationWarning
+            type="number"
+            min="0"
+            className="field-input"
+            value={form.expectedWordCount}
+            onChange={(event) => updateField("expectedWordCount", event.target.value)}
           />
         </Field>
         <Field label="Status">
@@ -244,14 +268,24 @@ export function TitleUpdateForm({ title }: TitleUpdateFormProps) {
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_280px]">
-        <Field label="Notes">
-          <textarea
-            suppressHydrationWarning
-            className="field-input min-h-28"
-            value={form.notes}
-            onChange={(event) => updateField("notes", event.target.value)}
-          />
-        </Field>
+        <div className="space-y-4">
+          <Field label="Ahtesham's Directives">
+            <textarea
+              suppressHydrationWarning
+              className="field-input min-h-28"
+              value={form.ahteshamDirectives}
+              onChange={(event) => updateField("ahteshamDirectives", event.target.value)}
+            />
+          </Field>
+          <Field label="General Notes">
+            <textarea
+              suppressHydrationWarning
+              className="field-input min-h-28"
+              value={form.notes}
+              onChange={(event) => updateField("notes", event.target.value)}
+            />
+          </Field>
+        </div>
         <div className="space-y-3 rounded-lg border border-black/10 bg-[#f6f4ee] p-3">
           <label className="flex items-start gap-3 text-sm font-medium text-ink">
             <input

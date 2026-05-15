@@ -68,6 +68,8 @@ export type TitleRecord = {
   approved_date: string | null;
   imported_supervisor_name: string | null;
   imported_writer_name: string | null;
+  expected_word_count: number | null;
+  ahtesham_directives: string | null;
   help_doc_url: string | null;
   script_doc_url: string | null;
   writer_due_date: string | null;
@@ -173,6 +175,8 @@ export type BrainstormingTitle = {
   priority: string | null;
   urgency: string | null;
   approved_due_date: string | null;
+  expected_word_count: number | null;
+  hold_until_date: string | null;
   submitted_by: string | null;
   submitted_by_name: string | null;
   supervisor: string | null;
@@ -238,7 +242,9 @@ export type EnrichedTitle = {
   writer: string;
   status: string;
   priority: string;
+  expectedWordCount: number | null;
   approvedDate: string | null;
+  createdDate: string | null;
   ageDays: number;
   ageBucket: AgeBucket;
   missingFields: string[];
@@ -268,6 +274,7 @@ export type EnrichedTitle = {
   blockedCategory: string | null;
   completedAt: string | null;
   notes: string | null;
+  ahteshamDirectives: string | null;
   sheetWriteBackStatus: string | null;
   sheetWriteBackAt: string | null;
   activityLog?: ActivityLogEntry[];

@@ -2,12 +2,22 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Copy, FilePlus, MessageSquare, X } from "lucide-react";
+import { Check, Copy, MessageSquare, X } from "lucide-react";
 import { BrainstormingStatusBadge } from "@/components/brainstorming/BrainstormingStatusBadge";
 import { BRAINSTORMING_DECISIONS, PRIORITIES, buildBrainstormingReport } from "@/lib/sharedConstants";
 import type { BrainstormingSession, BrainstormingTitle } from "@/lib/types";
 
-export function LiveMeetingClient({ session, titles, canDecide }: { session: BrainstormingSession; titles: BrainstormingTitle[]; canDecide: boolean }) {
+export function LiveMeetingClient({
+  session,
+  titles,
+  canDecide,
+  canEdit
+}: {
+  session: BrainstormingSession;
+  titles: BrainstormingTitle[];
+  canDecide: boolean;
+  canEdit: boolean;
+}) {
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [localSession, setLocalSession] = useState(session);
@@ -15,6 +25,7 @@ export function LiveMeetingClient({ session, titles, canDecide }: { session: Bra
   const [renaming, setRenaming] = useState(false);
   const [localTitles, setLocalTitles] = useState(titles);
   const [approvalSettings, setApprovalSettings] = useState(() => buildApprovalSettings(titles));
+  const [supervisorFilter, setSupervisorFilter] = useState("All");
 
   useEffect(() => {
     setLocalSession(session);
@@ -25,12 +36,17 @@ export function LiveMeetingClient({ session, titles, canDecide }: { session: Bra
 
   const grouped = useMemo(() => {
     const map = new Map<string, BrainstormingTitle[]>();
-    for (const title of localTitles) {
+    for (const title of getVisibleTitles(localTitles, supervisorFilter)) {
       const key = title.supervisor || title.submitted_by_name || "Unassigned";
       map.set(key, [...(map.get(key) ?? []), title]);
     }
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [localTitles]);
+  }, [localTitles, supervisorFilter]);
+  const supervisors = useMemo(
+    () => Array.from(new Set(localTitles.map((title) => title.supervisor || title.submitted_by_name || "Unassigned"))).sort(),
+    [localTitles]
+  );
+  const dormantHoldCount = localTitles.filter(isDormantHold).length;
   const report = buildBrainstormingReport(localSession, localTitles);
 
   async function patchTitle(id: string, body: Record<string, unknown>) {
@@ -54,7 +70,11 @@ export function LiveMeetingClient({ session, titles, canDecide }: { session: Bra
         ...current,
         [id]: {
           urgency: updatedTitle.urgency || updatedTitle.priority || "Normal",
-          dueDate: updatedTitle.approved_due_date || ""
+          dueDate: updatedTitle.approved_due_date || "",
+          expectedWordCount: updatedTitle.expected_word_count ? String(updatedTitle.expected_word_count) : "",
+          holdUntilDate: updatedTitle.hold_until_date || "",
+          titleText: updatedTitle.title,
+          directives: updatedTitle.ahtesham_notes || ""
         }
       }));
     } else {
@@ -95,8 +115,40 @@ export function LiveMeetingClient({ session, titles, canDecide }: { session: Bra
   function decide(title: BrainstormingTitle, decision: string) {
     const reason = window.prompt(decision === "Approve" ? "Approval note (optional)" : `Reason for: ${decision}`, title.decision_reason ?? "");
     if (reason === null) return;
-    const setting = approvalSettings[title.id] ?? { urgency: title.urgency || title.priority || "Normal", dueDate: title.approved_due_date || "" };
-    patchTitle(title.id, { action: "decision", decision, reason, urgency: setting.urgency, dueDate: setting.dueDate });
+    const setting = approvalSettings[title.id] ?? buildApprovalSetting(title);
+    patchTitle(title.id, {
+      action: "decision",
+      decision,
+      reason,
+      urgency: setting.urgency,
+      dueDate: setting.dueDate,
+      expectedWordCount: setting.expectedWordCount,
+      holdUntilDate: setting.holdUntilDate,
+      titleText: setting.titleText,
+      directives: setting.directives
+    });
+  }
+
+  function saveReviewFields(title: BrainstormingTitle) {
+    const setting = approvalSettings[title.id] ?? buildApprovalSetting(title);
+    patchTitle(title.id, {
+      action: "approval-fields",
+      urgency: setting.urgency,
+      dueDate: setting.dueDate,
+      expectedWordCount: setting.expectedWordCount,
+      holdUntilDate: setting.holdUntilDate
+    });
+  }
+
+  function saveTitleText(title: BrainstormingTitle) {
+    const setting = approvalSettings[title.id] ?? buildApprovalSetting(title);
+    if (!setting.titleText.trim()) return;
+    patchTitle(title.id, { action: "proposal", title: setting.titleText });
+  }
+
+  function saveDirectives(title: BrainstormingTitle) {
+    const setting = approvalSettings[title.id] ?? buildApprovalSetting(title);
+    patchTitle(title.id, { action: "meeting-notes", ahteshamNotes: setting.directives, discussionSummary: title.discussion_summary ?? "" });
   }
 
   return (
@@ -137,6 +189,24 @@ export function LiveMeetingClient({ session, titles, canDecide }: { session: Bra
         </div>
       </section>
 
+      <section className="rounded-lg border border-black/10 bg-white p-3 shadow-sm">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <label className="md:w-72">
+            <span className="text-xs font-semibold uppercase text-black/50">Supervisor Filter</span>
+            <select className="field-input mt-1" value={supervisorFilter} onChange={(event) => setSupervisorFilter(event.target.value)}>
+              <option value="All">All Supervisors</option>
+              {supervisors.map((name) => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
+          </label>
+          <div className="rounded-md bg-[#eef1eb] px-3 py-2 text-sm font-semibold text-moss">
+            Showing {supervisorFilter === "All" ? "all supervisors" : supervisorFilter}
+            {dormantHoldCount > 0 ? ` | ${dormantHoldCount} held until later` : ""}
+          </div>
+        </div>
+      </section>
+
       {grouped.map(([supervisor, items]) => (
         <section key={supervisor} className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between">
@@ -145,22 +215,39 @@ export function LiveMeetingClient({ session, titles, canDecide }: { session: Bra
           </div>
           <div className="mt-4 grid gap-4 xl:grid-cols-2">
             {items.map((title) => (
-              <article key={title.id} className="rounded-lg border border-black/10 bg-[#f6f4ee] p-4">
+              <article key={title.id} className={isResurfacedHold(title) ? "rounded-lg border border-amberline bg-[#fff8ec] p-4 shadow-[0_0_0_3px_rgba(245,158,11,0.16)]" : "rounded-lg border border-black/10 bg-[#f6f4ee] p-4"}>
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div>
                     <h3 className="text-xl font-semibold text-ink">{title.title}</h3>
                     <p className="mt-1 text-sm text-black/60">
-                      {title.channel || "MV N"} | {title.urgency || title.priority || "Normal"} | Due: {title.approved_due_date || "Not set"} | Writer: {title.suggested_writer || "Optional"}
+                      {title.channel || "MV N"} | {title.urgency || title.priority || "Normal"} | Due: {title.approved_due_date || "Not set"} | Expected: {title.expected_word_count || "Not set"} | Writer: {title.suggested_writer || "Optional"}
                     </p>
                   </div>
                   <BrainstormingStatusBadge status={title.status} />
                 </div>
 
                 {title.duplicate_warning ? <p className="mt-3 rounded-md bg-[#fff8ec] px-3 py-2 text-sm font-semibold text-amberline">{title.duplicate_warning}</p> : null}
+                {isResurfacedHold(title) ? <p className="mt-3 rounded-md bg-amber-100 px-3 py-2 text-sm font-semibold text-amber-900">Resurfaced From Hold | Held until {title.hold_until_date} | {title.decision_reason || "No hold reason added"}</p> : null}
                 <Info label="Pitch" value={title.short_pitch} />
                 <Info label="Why it is good" value={title.why_good} />
                 <Info label="References" value={title.reference_links} />
-                <Info label="Ahtesham notes" value={title.ahtesham_notes} />
+                <Info label="Ahtesham's Directives" value={title.ahtesham_notes} />
+
+                {canEdit ? (
+                  <div className="mt-4 rounded-md border border-black/10 bg-white p-3">
+                    <label>
+                      <span className="text-xs font-semibold uppercase text-black/50">Editable Title</span>
+                      <input
+                        className="field-input mt-1"
+                        value={approvalSettings[title.id]?.titleText ?? title.title}
+                        onChange={(event) => updateApprovalSetting(title.id, { titleText: event.target.value })}
+                      />
+                    </label>
+                    <button type="button" onClick={() => saveTitleText(title)} className="focus-ring mt-2 rounded-md border border-black/10 px-3 py-2 text-sm font-semibold text-moss hover:border-moss">
+                      Save Title Text
+                    </button>
+                  </div>
+                ) : null}
 
                 {canDecide ? (
                   <>
@@ -186,6 +273,41 @@ export function LiveMeetingClient({ session, titles, canDecide }: { session: Bra
                           ))}
                         </select>
                       </label>
+                      <label>
+                        <span className="text-xs font-semibold uppercase text-black/50">Expected Word Count</span>
+                        <input
+                          type="number"
+                          min="0"
+                          className="field-input mt-1"
+                          value={approvalSettings[title.id]?.expectedWordCount ?? title.expected_word_count ?? ""}
+                          onChange={(event) => updateApprovalSetting(title.id, { expectedWordCount: event.target.value })}
+                        />
+                      </label>
+                      {title.status === "Hold" || approvalSettings[title.id]?.holdUntilDate ? (
+                        <label>
+                          <span className="text-xs font-semibold uppercase text-black/50">Hold Until Date</span>
+                          <input
+                            type="date"
+                            className="field-input mt-1"
+                            value={approvalSettings[title.id]?.holdUntilDate ?? title.hold_until_date ?? ""}
+                            onChange={(event) => updateApprovalSetting(title.id, { holdUntilDate: event.target.value })}
+                          />
+                        </label>
+                      ) : null}
+                      <label className="md:col-span-2">
+                        <span className="text-xs font-semibold uppercase text-black/50">Ahtesham's Directives</span>
+                        <textarea
+                          className="field-input mt-1 min-h-24"
+                          value={approvalSettings[title.id]?.directives ?? title.ahtesham_notes ?? ""}
+                          onChange={(event) => updateApprovalSetting(title.id, { directives: event.target.value })}
+                        />
+                      </label>
+                      <button type="button" onClick={() => saveReviewFields(title)} className="focus-ring rounded-md border border-black/10 px-3 py-2 text-sm font-semibold text-moss hover:border-moss">
+                        Save Review Fields
+                      </button>
+                      <button type="button" onClick={() => saveDirectives(title)} className="focus-ring rounded-md border border-black/10 px-3 py-2 text-sm font-semibold text-moss hover:border-moss">
+                        Save Directives
+                      </button>
                     </div>
                     <div className="mt-4 grid gap-2 sm:grid-cols-3">
                       {BRAINSTORMING_DECISIONS.map((decision) => (
@@ -229,45 +351,6 @@ export function LiveMeetingClient({ session, titles, canDecide }: { session: Bra
                       Save Meeting Notes
                     </button>
                   ) : null}
-                  {title.status === "Proposed" ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const nextTitle = window.prompt("Edit title", title.title);
-                        if (!nextTitle) return;
-                        const shortPitch = window.prompt("Short pitch", title.short_pitch ?? "");
-                        const whyGood = window.prompt("Why this title is good", title.why_good ?? "");
-                        patchTitle(title.id, { action: "proposal", title: nextTitle, shortPitch, whyGood });
-                      }}
-                      className="focus-ring inline-flex items-center gap-2 rounded-md border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-moss hover:border-moss"
-                    >
-                      <Check size={15} />
-                      Edit Proposal
-                    </button>
-                  ) : null}
-                  {canDecide && title.status === "Approved" && !title.converted_title_id ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const setting = approvalSettings[title.id] ?? { urgency: title.urgency || title.priority || "Normal", dueDate: title.approved_due_date || "" };
-                          patchTitle(title.id, { action: "decision", decision: "Approve", reason: title.decision_reason, urgency: setting.urgency, dueDate: setting.dueDate });
-                        }}
-                        className="focus-ring inline-flex items-center gap-2 rounded-md border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-moss hover:border-moss"
-                      >
-                        <Check size={15} />
-                        Save Approval Details
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => patchTitle(title.id, { action: "convert" })}
-                        className="focus-ring inline-flex items-center gap-2 rounded-md bg-ink px-3 py-2 text-sm font-semibold text-white hover:bg-moss"
-                      >
-                        <FilePlus size={15} />
-                        Create Production Title
-                      </button>
-                    </>
-                  ) : null}
                   {title.converted_title_id ? (
                     <a className="inline-flex items-center gap-2 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800" href={`/titles/${title.converted_title_id}`}>
                       <Check size={15} />
@@ -302,18 +385,45 @@ export function LiveMeetingClient({ session, titles, canDecide }: { session: Bra
 type ApprovalSetting = {
   urgency: string;
   dueDate: string;
+  expectedWordCount: string;
+  holdUntilDate: string;
+  titleText: string;
+  directives: string;
 };
 
 function buildApprovalSettings(titles: BrainstormingTitle[]) {
   return Object.fromEntries(
-    titles.map((title) => [
-      title.id,
-      {
-        urgency: title.urgency || title.priority || "Normal",
-        dueDate: title.approved_due_date || ""
-      }
-    ])
+    titles.map((title) => [title.id, buildApprovalSetting(title)])
   ) as Record<string, ApprovalSetting>;
+}
+
+function buildApprovalSetting(title: BrainstormingTitle): ApprovalSetting {
+  return {
+    urgency: title.urgency || title.priority || "Normal",
+    dueDate: title.approved_due_date || "",
+    expectedWordCount: title.expected_word_count ? String(title.expected_word_count) : "",
+    holdUntilDate: title.hold_until_date || "",
+    titleText: title.title,
+    directives: title.ahtesham_notes || ""
+  };
+}
+
+function getVisibleTitles(titles: BrainstormingTitle[], supervisorFilter: string) {
+  return titles
+    .filter((title) => supervisorFilter === "All" || (title.supervisor || title.submitted_by_name || "Unassigned") === supervisorFilter)
+    .filter((title) => !isDormantHold(title));
+}
+
+function isDormantHold(title: BrainstormingTitle) {
+  return title.status === "Hold" && Boolean(title.hold_until_date && title.hold_until_date > todayKey());
+}
+
+function isResurfacedHold(title: BrainstormingTitle) {
+  return title.status === "Hold" && Boolean(title.hold_until_date && title.hold_until_date <= todayKey());
+}
+
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function Info({ label, value }: { label: string; value: string | null | undefined }) {
