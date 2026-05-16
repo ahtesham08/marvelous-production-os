@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MissingFieldsBadge } from "@/components/MissingFieldsBadge";
+import { PriorityBadge } from "@/components/PriorityBadge";
 import { SeverityBadge } from "@/components/SeverityBadge";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TitleUpdateForm } from "@/components/title-detail/TitleUpdateForm";
@@ -34,6 +35,7 @@ export default async function TitleDetailPage({
             <h1 className="mt-1 text-3xl font-semibold text-ink">{title.title}</h1>
             <div className="mt-3 flex flex-wrap gap-2">
               <StatusBadge status={title.status} />
+              <PriorityBadge priority={title.priority} />
               <SeverityBadge severity={title.severity} />
               {title.blocked ? (
                 <span className="rounded-md border border-danger/25 bg-red-50 px-2 py-1 text-xs font-semibold text-danger">
@@ -45,6 +47,7 @@ export default async function TitleDetailPage({
           <div className="grid gap-2 text-sm text-black/65 sm:grid-cols-2 lg:min-w-[420px]">
             <Info label="Supervisor" value={title.supervisor} />
             <Info label="Writer" value={title.writer} />
+            <Info label="Priority" value={title.priority} />
             <Info label="Age" value={`${title.ageDays} days`} />
             <Info label="Due Date" value={title.writerDueDate || "Missing"} />
             <Info label="Expected Word Count" value={title.expectedWordCount ? `${title.expectedWordCount}` : "Missing"} />

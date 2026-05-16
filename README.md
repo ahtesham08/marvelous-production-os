@@ -410,10 +410,13 @@ Admins can rename a session from Live Review Mode using the `Save Name` control 
 ## Live Review And Production Workflow Updates
 
 - The Main Title Table supports date filters for today, yesterday, current week, last week, and custom date ranges. These filters work with supervisor, channel, status, priority, and search filters, and the selected filters persist when opening a title and returning.
+- Main Title Table date filters now use `Asia/Kolkata`, so age-zero titles created or approved today appear under `Today`.
+- Main Title Table rows show expected word count, actual word count, priority, due date, VO, editor, and proofreader. Priority sorting orders `Ultra Urgent`, `Urgent`, `Normal`, then `Low`.
 - Live Review Mode supports expected word count, due date, urgency, editable title text, supervisor filtering, and Ahtesham's directives.
-- Clicking `Approve` in Live Review Mode now creates the production title immediately and prevents duplicate conversion if the title already has a production record.
+- Clicking `Approve` in Live Review Mode saves the visible review fields first, creates the production title immediately, prevents duplicate conversion if the title already has a production record, and creates an in-app supervisor notification.
 - Titles put on `Hold` can have a hold-until date. Future-held titles stay out of the active review list until that date, then return with a `Resurfaced From Hold` highlight.
-- Production title detail pages show expected word count separately from Deepak's actual word count, and show Ahtesham's directives in a dedicated editable section.
+- Production title detail pages show expected word count separately from Deepak's actual word count, show Ahtesham's directives in a dedicated editable section, and allow priority/urgency edits.
+- Supervisor approval notifications are visible from `/notifications` and the sidebar/header notification badge. WhatsApp and email notifications remain disabled.
 
 ## Production Launch Checklist Page
 
@@ -505,6 +508,7 @@ New migration:
 
 ```text
 supabase/migrations/005_brainstorming_module.sql
+supabase/migrations/008_in_app_notifications.sql
 ```
 
-Run this migration before using the new brainstorming routes in production.
+Run these migrations before using the new brainstorming and notification routes in production.

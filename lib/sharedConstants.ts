@@ -1,7 +1,23 @@
 import type { BrainstormingSession, BrainstormingTitle } from "@/lib/types";
 
 export const FRESH_START_CHANNELS = ["MV N", "LL", "Gamers", "Anime", "Long Reads"] as const;
-export const PRIORITIES = ["Low", "Normal", "Urgent", "ULTRA URGENT"] as const;
+export const PRIORITIES = ["Low", "Normal", "Urgent", "Ultra Urgent"] as const;
+
+export function normalizePriorityLabel(value: string | null | undefined) {
+  const cleaned = String(value ?? "").trim();
+  if (!cleaned) return "Normal";
+  if (cleaned.replace(/\s+/g, " ").toLowerCase() === "ultra urgent") return "Ultra Urgent";
+  const match = PRIORITIES.find((priority) => priority.toLowerCase() === cleaned.toLowerCase());
+  return match ?? "Normal";
+}
+
+export function priorityRank(value: string | null | undefined) {
+  const priority = normalizePriorityLabel(value);
+  if (priority === "Ultra Urgent") return 0;
+  if (priority === "Urgent") return 1;
+  if (priority === "Normal") return 2;
+  return 3;
+}
 
 export const BRAINSTORMING_DECISIONS = [
   "Approve",

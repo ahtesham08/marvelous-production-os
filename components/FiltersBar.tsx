@@ -10,6 +10,7 @@ type FiltersBarProps = {
   dateFilter: string;
   customStart: string;
   customEnd: string;
+  sortBy: string;
   search: string;
   onChannelChange: (value: string) => void;
   onSupervisorChange: (value: string) => void;
@@ -18,6 +19,7 @@ type FiltersBarProps = {
   onDateFilterChange: (value: string) => void;
   onCustomStartChange: (value: string) => void;
   onCustomEndChange: (value: string) => void;
+  onSortByChange: (value: string) => void;
   onSearchChange: (value: string) => void;
 };
 
@@ -31,6 +33,7 @@ export function FiltersBar({
   dateFilter,
   customStart,
   customEnd,
+  sortBy,
   search,
   onChannelChange,
   onSupervisorChange,
@@ -39,6 +42,7 @@ export function FiltersBar({
   onDateFilterChange,
   onCustomStartChange,
   onCustomEndChange,
+  onSortByChange,
   onSearchChange
 }: FiltersBarProps) {
   return (
@@ -111,12 +115,12 @@ export function FiltersBar({
         onChange={(event) => onPriorityChange(event.target.value)}
       >
         <option value="All">All priorities</option>
-        {["Low", "Normal", "Urgent", "ULTRA URGENT"].map((name) => (
+        {["Low", "Normal", "Urgent", "Ultra Urgent"].map((name) => (
           <option key={name} value={name}>{name}</option>
         ))}
       </select>
       </div>
-      <div className="mt-3 grid gap-3 md:grid-cols-[180px_180px_180px_1fr]">
+      <div className="mt-3 grid gap-3 md:grid-cols-[180px_180px_180px_180px_1fr]">
         <select
           suppressHydrationWarning
           className="focus-ring rounded-md border border-black/15 px-3 py-2 text-sm"
@@ -146,12 +150,30 @@ export function FiltersBar({
           disabled={dateFilter !== "custom"}
           onChange={(event) => onCustomEndChange(event.target.value)}
         />
+        <select
+          suppressHydrationWarning
+          className="focus-ring rounded-md border border-black/15 px-3 py-2 text-sm"
+          value={sortBy}
+          onChange={(event) => onSortByChange(event.target.value)}
+        >
+          <option value="age">Sort: Age</option>
+          <option value="priority">Sort: Priority</option>
+          <option value="newest">Sort: Newest</option>
+          <option value="due-date">Sort: Due Date</option>
+        </select>
         <div className="rounded-md bg-[#eef1eb] px-3 py-2 text-sm font-semibold text-moss">
-          Date filter: {formatDateFilter(dateFilter, customStart, customEnd)}
+          Date filter: {formatDateFilter(dateFilter, customStart, customEnd)} | {formatSort(sortBy)}
         </div>
       </div>
     </div>
   );
+}
+
+function formatSort(sortBy: string) {
+  if (sortBy === "priority") return "Urgency first";
+  if (sortBy === "newest") return "Newest first";
+  if (sortBy === "due-date") return "Due date first";
+  return "Oldest age first";
 }
 
 function formatDateFilter(dateFilter: string, start: string, end: string) {

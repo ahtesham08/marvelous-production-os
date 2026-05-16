@@ -4,10 +4,12 @@ import { getLocalTitleRecord, updateLocalTitleRecord } from "@/lib/localStore";
 import { STATUS_VALUES } from "@/lib/statusRules";
 import { createSupabaseAdminClient, hasSupabaseAdminConfig } from "@/lib/supabaseServer";
 import { normalizeTitle } from "@/lib/titleNormalizer";
+import { normalizePriorityLabel } from "@/lib/sharedConstants";
 import type { ProductionDetail, TitleRecord } from "@/lib/types";
 
 export type TitleUpdatePayload = {
   title?: string | null;
+  priority?: string | null;
   imported_supervisor_name?: string | null;
   imported_writer_name?: string | null;
   expected_word_count?: number | string | null;
@@ -224,6 +226,7 @@ function buildTitlePatch(
       patch.normalized_title = normalizeTitle(nextTitle);
     }
   }
+  if ("priority" in payload) patch.priority = normalizePriorityLabel(payload.priority);
   if ("imported_supervisor_name" in payload) patch.imported_supervisor_name = normalizeString(payload.imported_supervisor_name);
   if ("imported_writer_name" in payload) patch.imported_writer_name = normalizeString(payload.imported_writer_name);
   if ("expected_word_count" in payload) patch.expected_word_count = normalizeWordCount(payload.expected_word_count);

@@ -234,6 +234,20 @@ export type ActivityLogEntry = {
   created_at: string | null;
 };
 
+export type NotificationRecord = {
+  id: string;
+  recipient_user_id: string | null;
+  recipient_name: string | null;
+  title_id: string | null;
+  brainstorming_title_id: string | null;
+  session_id: string | null;
+  type: string;
+  message: string;
+  link_url: string | null;
+  read_at: string | null;
+  created_at: string | null;
+};
+
 export type EnrichedTitle = {
   id: string;
   title: string;

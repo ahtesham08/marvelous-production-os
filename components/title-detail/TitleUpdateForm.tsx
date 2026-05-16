@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Save } from "lucide-react";
 import { STATUS_VALUES } from "@/lib/statusRules";
+import { PRIORITIES } from "@/lib/sharedConstants";
 import type { EnrichedTitle } from "@/lib/types";
 
 type TitleUpdateFormProps = {
@@ -14,6 +15,7 @@ export function TitleUpdateForm({ title }: TitleUpdateFormProps) {
   const router = useRouter();
   const [form, setForm] = useState({
     titleText: title.title,
+    priority: title.priority,
     supervisor: title.supervisor === "Missing" ? "" : title.supervisor,
     writer: title.writer === "Missing" ? "" : title.writer,
     expectedWordCount: title.expectedWordCount?.toString() ?? "",
@@ -51,6 +53,7 @@ export function TitleUpdateForm({ title }: TitleUpdateFormProps) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         title: form.titleText,
+        priority: form.priority,
         imported_supervisor_name: form.supervisor,
         imported_writer_name: form.writer,
         expected_word_count: form.expectedWordCount ? Number(form.expectedWordCount) : null,
@@ -123,6 +126,20 @@ export function TitleUpdateForm({ title }: TitleUpdateFormProps) {
             value={form.supervisor}
             onChange={(event) => updateField("supervisor", event.target.value)}
           />
+        </Field>
+        <Field label="Priority / Urgency">
+          <select
+            suppressHydrationWarning
+            className="field-input"
+            value={form.priority}
+            onChange={(event) => updateField("priority", event.target.value)}
+          >
+            {PRIORITIES.map((priority) => (
+              <option key={priority} value={priority}>
+                {priority}
+              </option>
+            ))}
+          </select>
         </Field>
         <Field label="Writer">
           <input

@@ -125,7 +125,13 @@ export function LiveMeetingClient({
       expectedWordCount: setting.expectedWordCount,
       holdUntilDate: setting.holdUntilDate,
       titleText: setting.titleText,
-      directives: setting.directives
+      directives: setting.directives,
+      channel: title.channel,
+      supervisor: title.supervisor || title.submitted_by_name,
+      suggestedWriter: title.suggested_writer,
+      referenceLinks: title.reference_links,
+      notes: title.notes,
+      discussionSummary: title.discussion_summary
     });
   }
 

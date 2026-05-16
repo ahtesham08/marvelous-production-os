@@ -24,15 +24,12 @@ export const STATUS_VALUES: StatusValue[] = [
 ];
 
 export function calculateAgeDays(approvedDate: string | null, fallbackDate: string | null) {
-  const rawDate = approvedDate || fallbackDate;
-  if (!rawDate) return 0;
-
-  const start = new Date(rawDate);
-  if (Number.isNaN(start.getTime())) return 0;
-
-  const today = new Date();
-  const diffMs = today.getTime() - start.getTime();
-  return Math.max(0, Math.floor(diffMs / 86_400_000));
+  const startKey = toIndiaDateKey(approvedDate || fallbackDate);
+  if (!startKey) return 0;
+  const todayKey = toIndiaDateKey(new Date()) ?? startKey;
+  const start = Date.UTC(Number(startKey.slice(0, 4)), Number(startKey.slice(5, 7)) - 1, Number(startKey.slice(8, 10)));
+  const today = Date.UTC(Number(todayKey.slice(0, 4)), Number(todayKey.slice(5, 7)) - 1, Number(todayKey.slice(8, 10)));
+  return Math.max(0, Math.floor((today - start) / 86_400_000));
 }
 
 export function getAgeBucket(ageDays: number): AgeBucket {
@@ -62,4 +59,24 @@ export function nextActionForTitle(title: Pick<EnrichedTitle, "missingFields" | 
   if (title.missingFields.includes("Proofreader")) return "Deepak to assign proofreader";
   if (title.ageDays >= 15) return "Ask owner for latest status";
   return "Monitor";
+}
+
+export function toIndiaDateKey(value: string | Date | null | undefined) {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    const text = String(value);
+    return /^\d{4}-\d{2}-\d{2}/.test(text) ? text.slice(0, 10) : null;
+  }
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    })
+      .formatToParts(date)
+      .map((part) => [part.type, part.value])
+  );
+  return `${parts.year}-${parts.month}-${parts.day}`;
 }

@@ -2,7 +2,8 @@ import { normalizeTitle } from "@/lib/titleNormalizer";
 import { createLocalFreshTitles } from "@/lib/localStore";
 import { createSupabaseAdminClient, hasSupabaseAdminConfig } from "@/lib/supabaseServer";
 import { isProductionMode } from "@/lib/appMode";
-import { FRESH_START_CHANNELS, PRIORITIES } from "@/lib/sharedConstants";
+import { FRESH_START_CHANNELS, PRIORITIES, normalizePriorityLabel } from "@/lib/sharedConstants";
+import { toIndiaDateKey } from "@/lib/statusRules";
 
 export { FRESH_START_CHANNELS, PRIORITIES };
 
@@ -24,7 +25,7 @@ export async function createFreshTitle(input: FreshTitleInput) {
 
 export async function createFreshTitles(inputs: FreshTitleInput[]) {
   const now = new Date().toISOString();
-  const approvedDate = now.slice(0, 10);
+  const approvedDate = toIndiaDateKey(new Date()) ?? now.slice(0, 10);
   const cleanInputs = inputs.map(normalizeFreshInput).filter((input) => input.title.length > 0);
 
   if (cleanInputs.length === 0) {
@@ -169,8 +170,7 @@ function normalizePriority(value: string | null | undefined) {
   const cleaned = clean(value);
   if (!cleaned) return "Normal";
   if (cleaned.toLowerCase() === "high") return "Urgent";
-  const match = PRIORITIES.find((priority) => priority.toLowerCase() === cleaned.toLowerCase());
-  return match ?? "Normal";
+  return normalizePriorityLabel(cleaned);
 }
 
 function clean(value: string | null | undefined) {

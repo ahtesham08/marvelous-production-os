@@ -2,7 +2,8 @@ import { generateAlerts } from "@/lib/alertEngine";
 import { generateDailyReport } from "@/lib/reportGenerator";
 import { getLocalTitleRecords } from "@/lib/localStore";
 import { calculateNextAction } from "@/lib/nextActionEngine";
-import { calculateAgeDays, getAgeBucket, maxSeverity } from "@/lib/statusRules";
+import { calculateAgeDays, getAgeBucket, maxSeverity, toIndiaDateKey } from "@/lib/statusRules";
+import { normalizePriorityLabel } from "@/lib/sharedConstants";
 import { createSupabaseAdminClient, hasSupabaseAdminConfig } from "@/lib/supabaseServer";
 import type {
   DashboardData,
@@ -116,7 +117,7 @@ function buildDashboard(titles: EnrichedTitle[], setupWarning?: string): Dashboa
 
 function isToday(value: string | null) {
   if (!value) return false;
-  return value === new Date().toISOString().slice(0, 10);
+  return toIndiaDateKey(value) === toIndiaDateKey(new Date());
 }
 
 function isThisWeekDate(value: string | null) {
@@ -165,10 +166,10 @@ function enrichTitle(record: TitleRecord): EnrichedTitle {
     supervisor,
     writer,
     status,
-    priority: record.priority || "Normal",
+    priority: normalizePriorityLabel(record.priority),
     expectedWordCount: record.expected_word_count ?? null,
     approvedDate: record.approved_date,
-    createdDate: record.created_at ? record.created_at.slice(0, 10) : null,
+    createdDate: toIndiaDateKey(record.created_at),
     ageDays,
     ageBucket: getAgeBucket(ageDays),
     missingFields,

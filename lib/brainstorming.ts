@@ -3,7 +3,9 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { createSupabaseAdminClient, hasSupabaseAdminConfig } from "@/lib/supabaseServer";
 import { normalizeTitle } from "@/lib/titleNormalizer";
-import { FRESH_START_CHANNELS, PRIORITIES } from "@/lib/sharedConstants";
+import { FRESH_START_CHANNELS, normalizePriorityLabel } from "@/lib/sharedConstants";
+import { createBrainstormingApprovalNotification } from "@/lib/notifications";
+import { toIndiaDateKey } from "@/lib/statusRules";
 import type {
   BrainstormingDiscussionNote,
   BrainstormingSession,
@@ -480,7 +482,7 @@ export async function convertBrainstormingTitle(titleId: string, user: UserRecor
   if (title.status !== "Approved") throw new Error("Only approved brainstorming titles can be converted.");
 
   const now = new Date().toISOString();
-  const approvedDate = now.slice(0, 10);
+  const approvedDate = toIndiaDateKey(new Date()) ?? now.slice(0, 10);
 
   if (!hasSupabaseAdminConfig()) {
     const store = await readBrainstormingStore();
@@ -495,6 +497,7 @@ export async function convertBrainstormingTitle(titleId: string, user: UserRecor
   }
 
   const supabase = createSupabaseAdminClient();
+  const session = title.session_id ? await getBrainstormingSession(title.session_id) : null;
   const channelId = await ensureChannelId(title.channel || "MV N");
   const { data, error } = await supabase
     .from("titles")
@@ -544,6 +547,12 @@ export async function convertBrainstormingTitle(titleId: string, user: UserRecor
     .update({ status: "Converted To Production", converted_title_id: data.id, converted_at: now, updated_at: now })
     .eq("id", title.id);
   if (updateError) throw updateError;
+
+  await createBrainstormingApprovalNotification({
+    brainstormingTitle: title,
+    productionTitleId: data.id,
+    session
+  });
 
   return data;
 }
@@ -662,8 +671,7 @@ function normalizeChannel(value: string | null | undefined) {
 function normalizePriority(value: string | null | undefined) {
   const cleaned = clean(value);
   if (String(cleaned ?? "").toLowerCase() === "high") return "Urgent";
-  const match = PRIORITIES.find((priority) => priority.toLowerCase() === String(cleaned ?? "").toLowerCase());
-  return match ?? "Normal";
+  return normalizePriorityLabel(cleaned);
 }
 
 function normalizeDate(value: string | null | undefined) {

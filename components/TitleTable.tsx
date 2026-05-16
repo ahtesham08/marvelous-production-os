@@ -7,6 +7,9 @@ import { FiltersBar } from "@/components/FiltersBar";
 import { MissingFieldsBadge } from "@/components/MissingFieldsBadge";
 import { SeverityBadge } from "@/components/SeverityBadge";
 import { StatusBadge } from "@/components/StatusBadge";
+import { PriorityBadge } from "@/components/PriorityBadge";
+import { priorityRank } from "@/lib/sharedConstants";
+import { toIndiaDateKey } from "@/lib/statusRules";
 import type { EnrichedTitle } from "@/lib/types";
 
 type TitleTableProps = {
@@ -33,6 +36,7 @@ export function TitleTable({
   const [dateFilter, setDateFilter] = usePersistentFilter("date", "All", searchParams);
   const [customStart, setCustomStart] = usePersistentFilter("start", "", searchParams);
   const [customEnd, setCustomEnd] = usePersistentFilter("end", "", searchParams);
+  const [sortBy, setSortBy] = usePersistentFilter("sort", "age", searchParams);
 
   const supervisors = useMemo(
     () =>
@@ -64,7 +68,13 @@ export function TitleTable({
           title.channel,
           title.supervisor,
           title.writer,
+          title.priority,
           title.status,
+          title.expectedWordCount,
+          title.wordCount,
+          title.voArtist,
+          title.editor,
+          title.proofreader,
           title.matchStatus,
           title.missingFields.join(" ")
         ]
@@ -72,8 +82,8 @@ export function TitleTable({
           .toLowerCase()
           .includes(query);
       })
-      .sort((a, b) => b.ageDays - a.ageDays);
-  }, [channel, customEnd, customStart, dateFilter, priority, rottingOnly, search, status, supervisor, titles]);
+      .sort((a, b) => compareTitles(a, b, sortBy));
+  }, [channel, customEnd, customStart, dateFilter, priority, rottingOnly, search, sortBy, status, supervisor, titles]);
 
   useEffect(() => {
     const next = new URLSearchParams(searchParams.toString());
@@ -85,11 +95,12 @@ export function TitleTable({
     updateParam(next, "date", dateFilter, "All");
     updateParam(next, "start", customStart, "");
     updateParam(next, "end", customEnd, "");
+    updateParam(next, "sort", sortBy, "age");
     const query = next.toString();
     const nextUrl = query ? `${pathname}?${query}` : pathname;
     const currentUrl = searchParams.toString() ? `${pathname}?${searchParams}` : pathname;
     if (nextUrl !== currentUrl) router.replace(nextUrl, { scroll: false });
-  }, [channel, customEnd, customStart, dateFilter, initialChannel, initialSupervisor, pathname, priority, router, search, searchParams, status, supervisor]);
+  }, [channel, customEnd, customStart, dateFilter, initialChannel, initialSupervisor, pathname, priority, router, search, searchParams, sortBy, status, supervisor]);
 
   const returnPath = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
 
@@ -113,6 +124,8 @@ export function TitleTable({
         onDateFilterChange={setDateFilter}
         onCustomStartChange={setCustomStart}
         onCustomEndChange={setCustomEnd}
+        sortBy={sortBy}
+        onSortByChange={setSortBy}
         onSearchChange={setSearch}
       />
 
@@ -125,8 +138,15 @@ export function TitleTable({
                 <th className="px-4 py-3">Channel</th>
                 <th className="px-4 py-3">Supervisor</th>
                 <th className="px-4 py-3">Writer</th>
+                <th className="px-4 py-3">Expected WC</th>
+                <th className="px-4 py-3">Actual WC</th>
+                <th className="px-4 py-3">Priority</th>
                 <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Due Date</th>
                 <th className="px-4 py-3">Age</th>
+                <th className="px-4 py-3">VO</th>
+                <th className="px-4 py-3">Editor</th>
+                <th className="px-4 py-3">Proofreader</th>
                 <th className="px-4 py-3">Missing</th>
                 <th className="px-4 py-3">Action Needed</th>
                 <th className="px-4 py-3">Severity</th>
@@ -144,13 +164,22 @@ export function TitleTable({
                   <td className="px-4 py-3 text-black/70">{title.channel}</td>
                   <td className="px-4 py-3 text-black/70">{title.supervisor}</td>
                   <td className="px-4 py-3 text-black/70">{title.writer}</td>
+                  <td className="px-4 py-3 text-black/70">{formatNumber(title.expectedWordCount)}</td>
+                  <td className="px-4 py-3 text-black/70">{formatNumber(title.wordCount)}</td>
+                  <td className="px-4 py-3">
+                    <PriorityBadge priority={title.priority} />
+                  </td>
                   <td className="px-4 py-3">
                     <StatusBadge status={title.status} />
                   </td>
+                  <td className="px-4 py-3 text-black/70">{title.writerDueDate || "Not set"}</td>
                   <td className="px-4 py-3">
                     <div className="font-semibold text-ink">{title.ageDays}d</div>
                     <div className="text-xs text-black/50">{title.ageBucket}</div>
                   </td>
+                  <td className="px-4 py-3 text-black/70">{title.voArtist || "Not assigned"}</td>
+                  <td className="px-4 py-3 text-black/70">{title.editor || "Not assigned"}</td>
+                  <td className="px-4 py-3 text-black/70">{title.proofreader || "Not assigned"}</td>
                   <td className="px-4 py-3">
                     <MissingFieldsBadge fields={title.missingFields} />
                   </td>
@@ -192,7 +221,8 @@ function updateParam(params: URLSearchParams, key: string, value: string, fallba
 }
 
 function getDateRange(filter: string, customStart: string, customEnd: string) {
-  const today = startOfDay(new Date());
+  const todayKey = toIndiaDateKey(new Date()) ?? new Date().toISOString().slice(0, 10);
+  const today = parseDateKey(todayKey);
   if (filter === "today") return singleDate(today);
   if (filter === "yesterday") {
     const yesterday = addDays(today, -1);
@@ -229,5 +259,36 @@ function addDays(date: Date, days: number) {
 }
 
 function toDateKey(date: Date) {
-  return date.toISOString().slice(0, 10);
+  return toIndiaDateKey(date) ?? date.toISOString().slice(0, 10);
+}
+
+function parseDateKey(value: string) {
+  return new Date(`${value}T00:00:00`);
+}
+
+function compareTitles(a: EnrichedTitle, b: EnrichedTitle, sortBy: string) {
+  if (sortBy === "priority") {
+    const byPriority = priorityRank(a.priority) - priorityRank(b.priority);
+    if (byPriority !== 0) return byPriority;
+    return b.ageDays - a.ageDays;
+  }
+  if (sortBy === "newest") return newestDateValue(b.approvedDate || b.createdDate) - newestDateValue(a.approvedDate || a.createdDate);
+  if (sortBy === "due-date") return dateValue(a.writerDueDate) - dateValue(b.writerDueDate);
+  return b.ageDays - a.ageDays;
+}
+
+function dateValue(value: string | null) {
+  if (!value) return Number.MAX_SAFE_INTEGER;
+  const time = new Date(`${value.slice(0, 10)}T00:00:00`).getTime();
+  return Number.isFinite(time) ? time : Number.MAX_SAFE_INTEGER;
+}
+
+function newestDateValue(value: string | null) {
+  if (!value) return 0;
+  const time = new Date(`${value.slice(0, 10)}T00:00:00`).getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
+function formatNumber(value: number | null) {
+  return value === null || value === undefined ? "Not set" : value.toLocaleString("en-IN");
 }
