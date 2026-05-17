@@ -51,6 +51,26 @@ export async function getNotificationsForUser(user: UserRecord | null, limit = 2
   return (data ?? []) as NotificationRecord[];
 }
 
+export async function markNotificationRead(notificationId: string, user: UserRecord | null) {
+  if (!hasSupabaseAdminConfig() || !user || notificationId.startsWith("derived-")) return;
+
+  const supabase = createSupabaseAdminClient();
+  let query = supabase
+    .from("notifications")
+    .update({ read_at: new Date().toISOString() })
+    .eq("id", notificationId)
+    .is("read_at", null);
+
+  if (user.id?.startsWith("demo-")) {
+    query = query.ilike("recipient_name", user.name);
+  } else {
+    query = query.or(`recipient_user_id.eq.${user.id},recipient_name.ilike.${escapeFilter(user.name)}`);
+  }
+
+  const { error } = await query;
+  if (error && !isMissingNotificationsTable(error)) throw error;
+}
+
 async function getDerivedApprovalNotifications(user: UserRecord, limit: number) {
   const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase

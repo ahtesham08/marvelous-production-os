@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { NotificationsList } from "@/components/notifications/NotificationsList";
 import { getNotificationsForUser } from "@/lib/notifications";
 import { getCurrentUserContext } from "@/lib/serverAuth";
 
@@ -19,31 +19,7 @@ export default async function NotificationsPage() {
       </section>
 
       <section className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
-        <div className="space-y-3">
-          {notifications.map((notification) => (
-            <div key={notification.id} className="rounded-lg border border-black/10 bg-[#f6f4ee] p-4">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <div className="text-sm font-semibold text-moss">{notification.type}</div>
-                  <h2 className="mt-1 text-lg font-semibold text-ink">{notification.message}</h2>
-                  <p className="mt-1 text-xs text-black/50">
-                    {notification.created_at ? new Date(notification.created_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) : ""}
-                  </p>
-                </div>
-                {notification.link_url ? (
-                  <Link href={notification.link_url} className="focus-ring rounded-md bg-ink px-3 py-2 text-sm font-semibold text-white hover:bg-moss">
-                    Open Title
-                  </Link>
-                ) : null}
-              </div>
-            </div>
-          ))}
-        </div>
-        {notifications.length === 0 ? (
-          <p className="rounded-lg border border-black/10 bg-[#f6f4ee] p-8 text-center text-sm text-black/55">
-            No notifications yet.
-          </p>
-        ) : null}
+        <NotificationsList notifications={notifications} />
       </section>
     </div>
   );

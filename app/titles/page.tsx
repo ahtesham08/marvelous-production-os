@@ -1,10 +1,12 @@
 import { TitleTable } from "@/components/TitleTable";
 import { getDashboardData } from "@/lib/dashboardData";
+import { getCurrentUserContext } from "@/lib/serverAuth";
 
 export const dynamic = "force-dynamic";
 
 export default async function TitlesPage() {
-  const data = await getDashboardData();
+  const [data, userContext] = await Promise.all([getDashboardData(), getCurrentUserContext()]);
+  const canDelete = userContext.user?.role === "Admin" || userContext.user?.role === "Supervisor";
 
   return (
     <div className="space-y-4">
@@ -15,7 +17,7 @@ export default async function TitlesPage() {
           Filter by supervisor, channel, title, status, age, and missing fields.
         </p>
       </div>
-      <TitleTable titles={data.titles} />
+      <TitleTable titles={data.titles} canDelete={canDelete} />
     </div>
   );
 }

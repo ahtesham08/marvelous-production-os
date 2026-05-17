@@ -213,6 +213,13 @@ export async function updateLocalTitleRecord(
   await writeStore(store);
 }
 
+export async function deleteLocalTitleRecords(titleIds: string[]) {
+  const ids = new Set(titleIds);
+  const store = await readStore();
+  store.titles = store.titles.filter((title) => !ids.has(title.id));
+  await writeStore(store);
+}
+
 async function readStore(): Promise<LocalStore> {
   try {
     const raw = await readFile(storePath, "utf8");

@@ -6,11 +6,13 @@ import { SupervisorBreakdown } from "@/components/SupervisorBreakdown";
 import { SyncButton } from "@/components/SyncButton";
 import { TitleTable } from "@/components/TitleTable";
 import { getDashboardData } from "@/lib/dashboardData";
+import { getCurrentUserContext } from "@/lib/serverAuth";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const data = await getDashboardData();
+  const [data, userContext] = await Promise.all([getDashboardData(), getCurrentUserContext()]);
+  const canDelete = userContext.user?.role === "Admin" || userContext.user?.role === "Supervisor";
   const previewTitles = data.titles.slice(0, 25);
 
   return (
@@ -47,7 +49,7 @@ export default async function DashboardPage() {
           <h2 className="text-lg font-semibold text-ink">Main Title Table</h2>
           <p className="mt-1 text-sm text-black/55">Showing the highest-risk titles first.</p>
         </div>
-        <TitleTable titles={previewTitles.length > 0 ? previewTitles : data.titles} />
+        <TitleTable titles={previewTitles.length > 0 ? previewTitles : data.titles} canDelete={canDelete} />
       </section>
 
       <DailyReportBox report={data.dailyReport} />

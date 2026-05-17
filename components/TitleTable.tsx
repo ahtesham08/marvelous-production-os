@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { FiltersBar } from "@/components/FiltersBar";
@@ -16,17 +16,21 @@ type TitleTableProps = {
   initialSupervisor?: string;
   initialChannel?: string;
   rottingOnly?: boolean;
+  canDelete?: boolean;
 };
 
 export function TitleTable({
   titles,
   initialSupervisor = "All",
   initialChannel = "All",
-  rottingOnly = false
+  rottingOnly = false,
+  canDelete = false
 }: TitleTableProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
   const [search, setSearch] = usePersistentFilter("q", "", searchParams);
   const [supervisor, setSupervisor] = usePersistentFilter("supervisor", initialSupervisor, searchParams);
   const [channel, setChannel] = usePersistentFilter("channel", initialChannel, searchParams);
@@ -36,6 +40,8 @@ export function TitleTable({
   const [customStart, setCustomStart] = usePersistentFilter("start", "", searchParams);
   const [customEnd, setCustomEnd] = usePersistentFilter("end", "", searchParams);
   const [sortBy, setSortBy] = usePersistentFilter("sort", "age", searchParams);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [deleting, setDeleting] = useState(false);
 
   const supervisors = useMemo(
     () =>
@@ -102,6 +108,55 @@ export function TitleTable({
   }, [channel, customEnd, customStart, dateFilter, initialChannel, initialSupervisor, pathname, priority, router, search, searchParams, sortBy, status, supervisor]);
 
   const returnPath = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
+  const visibleIds = filteredTitles.map((title) => title.id);
+  const selectedVisibleIds = selectedIds.filter((id) => visibleIds.includes(id));
+  const allVisibleSelected = visibleIds.length > 0 && selectedVisibleIds.length === visibleIds.length;
+
+  useEffect(() => {
+    setSelectedIds((current) => current.filter((id) => visibleIds.includes(id)));
+  }, [visibleIds.join("|")]);
+
+  function syncScroll(source: "top" | "table") {
+    const from = source === "top" ? topScrollRef.current : tableScrollRef.current;
+    const to = source === "top" ? tableScrollRef.current : topScrollRef.current;
+    if (!from || !to || to.scrollLeft === from.scrollLeft) return;
+    to.scrollLeft = from.scrollLeft;
+  }
+
+  function toggleSelectAll() {
+    if (allVisibleSelected) {
+      setSelectedIds((current) => current.filter((id) => !visibleIds.includes(id)));
+    } else {
+      setSelectedIds((current) => Array.from(new Set([...current, ...visibleIds])));
+    }
+  }
+
+  function toggleTitle(id: string) {
+    setSelectedIds((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
+  }
+
+  async function deleteSelected() {
+    if (selectedVisibleIds.length === 0) return;
+    const confirmed = window.confirm(
+      `Delete ${selectedVisibleIds.length} production title(s)?\n\nThis permanently removes the selected titles from Marvelous Production OS. Old Google Sheets will not be touched.`
+    );
+    if (!confirmed) return;
+
+    setDeleting(true);
+    const response = await fetch("/api/titles", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: selectedVisibleIds })
+    });
+    const payload = await response.json();
+    setDeleting(false);
+    if (!response.ok) {
+      alert(payload.error || "Could not delete selected titles.");
+      return;
+    }
+    setSelectedIds([]);
+    router.refresh();
+  }
 
   return (
     <div className="space-y-3">
@@ -128,11 +183,45 @@ export function TitleTable({
         onSearchChange={setSearch}
       />
 
+      {canDelete ? (
+        <div className="flex flex-col gap-2 rounded-lg border border-black/10 bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-sm font-semibold text-ink">
+            {selectedVisibleIds.length} selected
+          </div>
+          <button
+            type="button"
+            disabled={selectedVisibleIds.length === 0 || deleting}
+            onClick={deleteSelected}
+            className="focus-ring rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-danger hover:border-danger disabled:opacity-50"
+          >
+            {deleting ? "Deleting" : "Delete Selected Titles"}
+          </button>
+        </div>
+      ) : null}
+
       <div className="rounded-lg border border-black/10 bg-white shadow-sm">
-        <div className="overflow-x-auto pb-2">
-          <table className="min-w-[1680px] divide-y divide-black/10 text-left text-sm">
+        <div
+          ref={topScrollRef}
+          onScroll={() => syncScroll("top")}
+          className="sticky top-0 z-10 overflow-x-auto border-b border-black/10 bg-white"
+          aria-label="Top horizontal table scrollbar"
+        >
+          <div className="h-4 min-w-[1760px]" />
+        </div>
+        <div ref={tableScrollRef} onScroll={() => syncScroll("table")} className="overflow-x-auto pb-2">
+          <table className="min-w-[1760px] divide-y divide-black/10 text-left text-sm">
             <thead className="bg-[#eef1eb] text-xs uppercase text-black/55">
               <tr>
+                {canDelete ? (
+                  <th className="w-12 px-4 py-3">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all visible titles"
+                      checked={allVisibleSelected}
+                      onChange={toggleSelectAll}
+                    />
+                  </th>
+                ) : null}
                 <th className="px-4 py-3">Title</th>
                 <th className="px-4 py-3">Channel</th>
                 <th className="px-4 py-3">Supervisor</th>
@@ -152,6 +241,16 @@ export function TitleTable({
             <tbody className="divide-y divide-black/10">
               {filteredTitles.map((title) => (
                 <tr key={title.id} className="align-top hover:bg-[#faf9f5]">
+                  {canDelete ? (
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${title.title}`}
+                        checked={selectedIds.includes(title.id)}
+                        onChange={() => toggleTitle(title.id)}
+                      />
+                    </td>
+                  ) : null}
                   <td className="max-w-sm px-4 py-3 font-medium text-ink">
                     <Link href={`/titles/${title.id}?return=${encodeURIComponent(returnPath)}`} className="transition hover:text-moss hover:underline">
                       {title.title}
@@ -239,11 +338,6 @@ function singleDate(date: Date) {
   return { start: key, end: key };
 }
 
-function startOfDay(date: Date) {
-  const next = new Date(date);
-  next.setHours(0, 0, 0, 0);
-  return next;
-}
 function addDays(date: Date, days: number) {
   const next = new Date(date);
   next.setDate(next.getDate() + days);

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Save } from "lucide-react";
 import { STATUS_VALUES } from "@/lib/statusRules";
-import { PRIORITIES } from "@/lib/sharedConstants";
+import { FRESH_START_CHANNELS, PRIORITIES } from "@/lib/sharedConstants";
 import type { EnrichedTitle } from "@/lib/types";
 
 type TitleUpdateFormProps = {
@@ -15,6 +15,7 @@ export function TitleUpdateForm({ title }: TitleUpdateFormProps) {
   const router = useRouter();
   const [form, setForm] = useState({
     titleText: title.title,
+    channel: title.channel,
     priority: title.priority,
     supervisor: title.supervisor === "Missing" ? "" : title.supervisor,
     writer: title.writer === "Missing" ? "" : title.writer,
@@ -53,6 +54,7 @@ export function TitleUpdateForm({ title }: TitleUpdateFormProps) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         title: form.titleText,
+        channel: form.channel,
         priority: form.priority,
         imported_supervisor_name: form.supervisor,
         imported_writer_name: form.writer,
@@ -126,6 +128,20 @@ export function TitleUpdateForm({ title }: TitleUpdateFormProps) {
             value={form.supervisor}
             onChange={(event) => updateField("supervisor", event.target.value)}
           />
+        </Field>
+        <Field label="Channel">
+          <select
+            suppressHydrationWarning
+            className="field-input"
+            value={form.channel}
+            onChange={(event) => updateField("channel", event.target.value)}
+          >
+            {FRESH_START_CHANNELS.map((channel) => (
+              <option key={channel} value={channel}>
+                {channel}
+              </option>
+            ))}
+          </select>
         </Field>
         <Field label="Priority / Urgency">
           <select

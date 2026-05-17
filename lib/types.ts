@@ -63,6 +63,7 @@ export type TitleRecord = {
   id: string;
   title: string;
   normalized_title: string | null;
+  channel_id?: string | null;
   priority: string | null;
   source: string | null;
   approved_date: string | null;

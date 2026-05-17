@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Copy, MessageSquare, X } from "lucide-react";
 import { BrainstormingStatusBadge } from "@/components/brainstorming/BrainstormingStatusBadge";
-import { BRAINSTORMING_DECISIONS, PRIORITIES, buildBrainstormingReport } from "@/lib/sharedConstants";
+import { BRAINSTORMING_DECISIONS, FRESH_START_CHANNELS, PRIORITIES, buildBrainstormingReport } from "@/lib/sharedConstants";
 import type { BrainstormingSession, BrainstormingTitle } from "@/lib/types";
 
 export function LiveMeetingClient({
@@ -70,6 +70,7 @@ export function LiveMeetingClient({
         ...current,
         [id]: {
           urgency: updatedTitle.urgency || updatedTitle.priority || "Normal",
+          channel: updatedTitle.channel || "MV N",
           dueDate: updatedTitle.approved_due_date || "",
           expectedWordCount: updatedTitle.expected_word_count ? String(updatedTitle.expected_word_count) : "",
           holdUntilDate: updatedTitle.hold_until_date || "",
@@ -108,7 +109,7 @@ export function LiveMeetingClient({
   function updateApprovalSetting(id: string, patch: Partial<ApprovalSetting>) {
     setApprovalSettings((current) => ({
       ...current,
-      [id]: { ...(current[id] ?? { urgency: "Normal", dueDate: "" }), ...patch }
+      [id]: { ...(current[id] ?? buildApprovalSetting(localTitles.find((title) => title.id === id))), ...patch }
     }));
   }
 
@@ -120,13 +121,13 @@ export function LiveMeetingClient({
       action: "decision",
       decision,
       reason,
+      channel: setting.channel,
       urgency: setting.urgency,
       dueDate: setting.dueDate,
       expectedWordCount: setting.expectedWordCount,
       holdUntilDate: setting.holdUntilDate,
       titleText: setting.titleText,
       directives: setting.directives,
-      channel: title.channel,
       supervisor: title.supervisor || title.submitted_by_name,
       suggestedWriter: title.suggested_writer,
       referenceLinks: title.reference_links,
@@ -139,6 +140,7 @@ export function LiveMeetingClient({
     const setting = approvalSettings[title.id] ?? buildApprovalSetting(title);
     patchTitle(title.id, {
       action: "approval-fields",
+      channel: setting.channel,
       urgency: setting.urgency,
       dueDate: setting.dueDate,
       expectedWordCount: setting.expectedWordCount,
@@ -149,7 +151,7 @@ export function LiveMeetingClient({
   function saveTitleText(title: BrainstormingTitle) {
     const setting = approvalSettings[title.id] ?? buildApprovalSetting(title);
     if (!setting.titleText.trim()) return;
-    patchTitle(title.id, { action: "proposal", title: setting.titleText });
+    patchTitle(title.id, { action: "proposal", title: setting.titleText, channel: setting.channel });
   }
 
   function saveDirectives(title: BrainstormingTitle) {
@@ -249,8 +251,20 @@ export function LiveMeetingClient({
                         onChange={(event) => updateApprovalSetting(title.id, { titleText: event.target.value })}
                       />
                     </label>
+                    <label className="mt-3 block">
+                      <span className="text-xs font-semibold uppercase text-black/50">Channel</span>
+                      <select
+                        className="field-input mt-1"
+                        value={approvalSettings[title.id]?.channel ?? title.channel ?? "MV N"}
+                        onChange={(event) => updateApprovalSetting(title.id, { channel: event.target.value })}
+                      >
+                        {FRESH_START_CHANNELS.map((channel) => (
+                          <option key={channel} value={channel}>{channel}</option>
+                        ))}
+                      </select>
+                    </label>
                     <button type="button" onClick={() => saveTitleText(title)} className="focus-ring mt-2 rounded-md border border-black/10 px-3 py-2 text-sm font-semibold text-moss hover:border-moss">
-                      Save Title Text
+                      Save Title And Channel
                     </button>
                   </div>
                 ) : null}
@@ -389,6 +403,7 @@ export function LiveMeetingClient({
 }
 
 type ApprovalSetting = {
+  channel: string;
   urgency: string;
   dueDate: string;
   expectedWordCount: string;
@@ -403,14 +418,15 @@ function buildApprovalSettings(titles: BrainstormingTitle[]) {
   ) as Record<string, ApprovalSetting>;
 }
 
-function buildApprovalSetting(title: BrainstormingTitle): ApprovalSetting {
+function buildApprovalSetting(title: BrainstormingTitle | undefined): ApprovalSetting {
   return {
-    urgency: title.urgency || title.priority || "Normal",
-    dueDate: title.approved_due_date || "",
-    expectedWordCount: title.expected_word_count ? String(title.expected_word_count) : "",
-    holdUntilDate: title.hold_until_date || "",
-    titleText: title.title,
-    directives: title.ahtesham_notes || ""
+    channel: title?.channel || "MV N",
+    urgency: title?.urgency || title?.priority || "Normal",
+    dueDate: title?.approved_due_date || "",
+    expectedWordCount: title?.expected_word_count ? String(title.expected_word_count) : "",
+    holdUntilDate: title?.hold_until_date || "",
+    titleText: title?.title || "",
+    directives: title?.ahtesham_notes || ""
   };
 }
 

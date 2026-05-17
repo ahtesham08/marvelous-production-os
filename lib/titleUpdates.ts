@@ -1,14 +1,15 @@
 import { columnToA1, getSheetValues, PRODUCTION_SPREADSHEET_ID, updateSheetValues } from "@/lib/googleSheets";
 import { isProductionMode } from "@/lib/appMode";
-import { getLocalTitleRecord, updateLocalTitleRecord } from "@/lib/localStore";
+import { deleteLocalTitleRecords, getLocalTitleRecord, updateLocalTitleRecord } from "@/lib/localStore";
 import { STATUS_VALUES } from "@/lib/statusRules";
 import { createSupabaseAdminClient, hasSupabaseAdminConfig } from "@/lib/supabaseServer";
 import { normalizeTitle } from "@/lib/titleNormalizer";
-import { normalizePriorityLabel } from "@/lib/sharedConstants";
-import type { ProductionDetail, TitleRecord } from "@/lib/types";
+import { FRESH_START_CHANNELS, normalizePriorityLabel } from "@/lib/sharedConstants";
+import type { ProductionDetail, TitleRecord, UserRecord } from "@/lib/types";
 
 export type TitleUpdatePayload = {
   title?: string | null;
+  channel?: string | null;
   priority?: string | null;
   imported_supervisor_name?: string | null;
   imported_writer_name?: string | null;
@@ -58,14 +59,18 @@ export async function updateTitle(titleId: string, payload: TitleUpdatePayload) 
   const existing = await getTitleRecord(titleId);
   const existingDetail = firstDetail(existing.production_details);
   const now = new Date().toISOString();
+  const channelUpdate = "channel" in payload ? await resolveChannelUpdate(payload.channel) : null;
 
-  const titlePatch = buildTitlePatch(payload, existing, existingDetail, now);
+  const titlePatch = buildTitlePatch(payload, existing, existingDetail, now, channelUpdate);
   const productionPatch = buildProductionPatch(payload, existingDetail);
 
   validateTitleUpdate({ ...existing, ...titlePatch }, { ...existingDetail, ...productionPatch }, payload);
 
   const changes = collectTitleChanges(existing, titlePatch);
   changes.push(...collectProductionChanges(existingDetail, productionPatch));
+  if (channelUpdate && channelUpdate.channelName !== getRecordChannel(existing)) {
+    changes.push({ field: "channel", oldValue: getRecordChannel(existing), newValue: channelUpdate.channelName });
+  }
 
   if (!hasSupabaseAdminConfig()) {
     if (isProductionMode()) {
@@ -116,6 +121,36 @@ export async function updateTitle(titleId: string, payload: TitleUpdatePayload) 
     changes,
     writeBackResult
   };
+}
+
+export async function deleteTitles(titleIds: string[], user: UserRecord | null) {
+  const ids = Array.from(new Set(titleIds.filter(Boolean)));
+  if (ids.length === 0) throw new Error("Select at least one title to delete.");
+
+  const records = await Promise.all(ids.map((id) => getTitleRecord(id)));
+  const unauthorized = records.filter((record) => !canDeleteTitleRecord(record, user));
+  if (unauthorized.length > 0) {
+    throw new Error("You do not have permission to delete one or more selected titles.");
+  }
+
+  if (!hasSupabaseAdminConfig()) {
+    if (isProductionMode()) {
+      throw new Error("Production mode requires Supabase. Add Supabase environment variables before deleting titles.");
+    }
+    await deleteLocalTitleRecords(ids);
+    return { deletedCount: ids.length };
+  }
+
+  const supabase = createSupabaseAdminClient();
+  const { error: clearBrainstormingError } = await supabase
+    .from("brainstorming_titles")
+    .update({ converted_title_id: null, converted_at: null, updated_at: new Date().toISOString() })
+    .in("converted_title_id", ids);
+  if (clearBrainstormingError && !isMissingBrainstormingTable(clearBrainstormingError)) throw clearBrainstormingError;
+
+  const { error } = await supabase.from("titles").delete().in("id", ids);
+  if (error) throw error;
+  return { deletedCount: ids.length };
 }
 
 export async function getTitleRecord(titleId: string) {
@@ -215,7 +250,8 @@ function buildTitlePatch(
   payload: TitleUpdatePayload,
   existing: TitleRecord,
   existingDetail: ProductionDetail | null,
-  now: string
+  now: string,
+  channelUpdate: { channelId: string | null; channelName: string } | null
 ) {
   const patch: Partial<TitleRecord> = {};
 
@@ -227,6 +263,10 @@ function buildTitlePatch(
     }
   }
   if ("priority" in payload) patch.priority = normalizePriorityLabel(payload.priority);
+  if (channelUpdate) {
+    if (hasSupabaseAdminConfig()) patch.channel_id = channelUpdate.channelId;
+    else patch.channels = { name: channelUpdate.channelName };
+  }
   if ("imported_supervisor_name" in payload) patch.imported_supervisor_name = normalizeString(payload.imported_supervisor_name);
   if ("imported_writer_name" in payload) patch.imported_writer_name = normalizeString(payload.imported_writer_name);
   if ("expected_word_count" in payload) patch.expected_word_count = normalizeWordCount(payload.expected_word_count);
@@ -266,6 +306,7 @@ function buildTitlePatch(
   if (finalStatus !== existing.current_status || writerName !== existing.imported_writer_name || wordCount !== existingDetail?.word_count) {
     patch.updated_at = now;
   }
+  if (channelUpdate && channelUpdate.channelName !== getRecordChannel(existing)) patch.updated_at = now;
 
   if (
     finalStatus === "Completed" &&
@@ -398,7 +439,7 @@ function normalizeHeader(value: unknown) {
 
 function collectTitleChanges(existing: TitleRecord, patch: Partial<TitleRecord>) {
   return Object.entries(patch)
-    .filter(([field]) => !["updated_at"].includes(field))
+    .filter(([field]) => !["updated_at", "channel_id", "channels"].includes(field))
     .filter(([field, value]) => stringify(existing[field as keyof TitleRecord]) !== stringify(value))
     .map(([field, value]) => ({
       field,
@@ -440,6 +481,44 @@ function normalizeString(value: unknown) {
 function clean(value: unknown) {
   const text = String(value ?? "").trim();
   return text.length > 0 ? text : null;
+}
+
+async function resolveChannelUpdate(value: string | null | undefined) {
+  const channelName = normalizeChannel(value);
+  if (!hasSupabaseAdminConfig()) return { channelId: null, channelName };
+  return { channelId: await ensureChannelId(channelName), channelName };
+}
+
+async function ensureChannelId(channelName: string) {
+  const supabase = createSupabaseAdminClient();
+  await supabase
+    .from("channels")
+    .upsert({ name: channelName, sheet_tab_name: channelName, active: true, updated_at: new Date().toISOString() }, { onConflict: "name" });
+  const { data, error } = await supabase.from("channels").select("id").eq("name", channelName).single();
+  if (error) throw error;
+  return data.id as string;
+}
+
+function normalizeChannel(value: string | null | undefined) {
+  const cleaned = normalizeString(value);
+  const match = FRESH_START_CHANNELS.find((channel) => channel.toLowerCase() === String(cleaned ?? "").toLowerCase());
+  return match ?? "MV N";
+}
+
+function getRecordChannel(record: TitleRecord) {
+  return record.channels?.name || record.production_sheet_tab || "Unassigned";
+}
+
+function canDeleteTitleRecord(record: TitleRecord, user: UserRecord | null) {
+  if (!user) return false;
+  if (user.role === "Admin") return true;
+  if (user.role !== "Supervisor") return false;
+  const supervisor = clean(record.imported_supervisor_name);
+  return Boolean(supervisor && supervisor.toLowerCase() === user.name.toLowerCase());
+}
+
+function isMissingBrainstormingTable(error: { message?: string; code?: string }) {
+  return error.code === "42P01" || String(error.message ?? "").includes("brainstorming_");
 }
 
 function stringify(value: unknown) {

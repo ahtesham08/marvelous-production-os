@@ -57,6 +57,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     if (payload.action === "approval-fields") {
       if (!isAdmin(userContext.user?.role)) return NextResponse.json({ error: "Only Admin can edit approval fields." }, { status: 403 });
+      if (payload.channel) {
+        await updateBrainstormingProposal(id, { channel: payload.channel });
+      }
       await updateBrainstormingTitleApprovalFields(id, payload);
       return NextResponse.json({ ok: true, title: await getBrainstormingTitle(id) });
     }

@@ -4,8 +4,10 @@ import { MissingFieldsBadge } from "@/components/MissingFieldsBadge";
 import { PriorityBadge } from "@/components/PriorityBadge";
 import { SeverityBadge } from "@/components/SeverityBadge";
 import { StatusBadge } from "@/components/StatusBadge";
+import { DeleteTitleButton } from "@/components/title-detail/DeleteTitleButton";
 import { TitleUpdateForm } from "@/components/title-detail/TitleUpdateForm";
 import { getDashboardData } from "@/lib/dashboardData";
+import { getCurrentUserContext } from "@/lib/serverAuth";
 
 export const dynamic = "force-dynamic";
 
@@ -18,10 +20,13 @@ export default async function TitleDetailPage({
 }) {
   const { id } = await params;
   const { return: returnPath } = await searchParams;
-  const data = await getDashboardData();
+  const [data, userContext] = await Promise.all([getDashboardData(), getCurrentUserContext()]);
   const title = data.titles.find((item) => item.id === id);
 
   if (!title) notFound();
+  const canDelete =
+    userContext.user?.role === "Admin" ||
+    (userContext.user?.role === "Supervisor" && title.supervisor.toLowerCase() === userContext.user.name.toLowerCase());
 
   return (
     <div className="space-y-5">
@@ -29,6 +34,11 @@ export default async function TitleDetailPage({
         <Link href={returnPath || "/titles"} className="text-sm font-semibold text-moss hover:underline">
           Back to titles
         </Link>
+        {canDelete ? (
+          <div className="mt-3">
+            <DeleteTitleButton titleId={title.id} titleName={title.title} returnPath={returnPath || "/titles"} />
+          </div>
+        ) : null}
         <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase text-moss">{title.channel}</p>
@@ -47,6 +57,7 @@ export default async function TitleDetailPage({
           <div className="grid gap-2 text-sm text-black/65 sm:grid-cols-2 lg:min-w-[420px]">
             <Info label="Supervisor" value={title.supervisor} />
             <Info label="Writer" value={title.writer} />
+            <Info label="Channel" value={title.channel} />
             <Info label="Priority" value={title.priority} />
             <Info label="Age" value={`${title.ageDays} days`} />
             <Info label="Due Date" value={title.writerDueDate || "Missing"} />
