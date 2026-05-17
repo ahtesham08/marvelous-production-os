@@ -88,6 +88,7 @@ export function FiltersBar({
         onChange={(event) => onStatusChange(event.target.value)}
       >
         <option value="All">All statuses</option>
+        <option value="not-completed">All Except Completed</option>
         {[
           "Approved",
           "Assigned To Supervisor",

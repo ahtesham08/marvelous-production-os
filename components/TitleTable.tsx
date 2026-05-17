@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { FiltersBar } from "@/components/FiltersBar";
 import { MissingFieldsBadge } from "@/components/MissingFieldsBadge";
-import { SeverityBadge } from "@/components/SeverityBadge";
 import { StatusBadge } from "@/components/StatusBadge";
 import { PriorityBadge } from "@/components/PriorityBadge";
 import { priorityRank } from "@/lib/sharedConstants";
@@ -54,7 +53,7 @@ export function TitleTable({
       .filter((title) => !rottingOnly || title.severity === "Critical" || title.ageDays >= 8 || title.matchStatus === "Not Migrated")
       .filter((title) => supervisor === "All" || title.supervisor === supervisor)
       .filter((title) => channel === "All" || title.channel === channel)
-      .filter((title) => status === "All" || title.status === status)
+      .filter((title) => status === "All" || (status === "not-completed" ? title.status !== "Completed" : title.status === status))
       .filter((title) => priority === "All" || title.priority === priority)
       .filter((title) => {
         if (!range) return true;
@@ -129,9 +128,9 @@ export function TitleTable({
         onSearchChange={setSearch}
       />
 
-      <div className="overflow-hidden rounded-lg border border-black/10 bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-black/10 text-left text-sm">
+      <div className="rounded-lg border border-black/10 bg-white shadow-sm">
+        <div className="overflow-x-auto pb-2">
+          <table className="min-w-[1680px] divide-y divide-black/10 text-left text-sm">
             <thead className="bg-[#eef1eb] text-xs uppercase text-black/55">
               <tr>
                 <th className="px-4 py-3">Title</th>
@@ -148,8 +147,6 @@ export function TitleTable({
                 <th className="px-4 py-3">Editor</th>
                 <th className="px-4 py-3">Proofreader</th>
                 <th className="px-4 py-3">Missing</th>
-                <th className="px-4 py-3">Action Needed</th>
-                <th className="px-4 py-3">Severity</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-black/10">
@@ -182,10 +179,6 @@ export function TitleTable({
                   <td className="px-4 py-3 text-black/70">{title.proofreader || "Not assigned"}</td>
                   <td className="px-4 py-3">
                     <MissingFieldsBadge fields={title.missingFields} />
-                  </td>
-                  <td className="max-w-xs px-4 py-3 text-black/70">{title.nextAction}</td>
-                  <td className="px-4 py-3">
-                    <SeverityBadge severity={title.severity} />
                   </td>
                 </tr>
               ))}
@@ -251,7 +244,6 @@ function startOfDay(date: Date) {
   next.setHours(0, 0, 0, 0);
   return next;
 }
-
 function addDays(date: Date, days: number) {
   const next = new Date(date);
   next.setDate(next.getDate() + days);

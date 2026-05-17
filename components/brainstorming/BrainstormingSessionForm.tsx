@@ -9,8 +9,9 @@ const supervisors = ["Ahtesham", "Kamran", "Farhan", "Raktim", "Deepak"];
 
 export function BrainstormingSessionForm() {
   const router = useRouter();
-  const [name, setName] = useState(`Brainstorming ${new Date().toISOString().slice(0, 10)}`);
-  const [sessionDate, setSessionDate] = useState(new Date().toISOString().slice(0, 10));
+  const today = getIndiaDateKey();
+  const [name, setName] = useState(`Brainstorming ${today}`);
+  const [sessionDate, setSessionDate] = useState(today);
   const [channels, setChannels] = useState<string[]>(["MV N"]);
   const [participants, setParticipants] = useState<string[]>(["Ahtesham", "Kamran", "Farhan", "Raktim"]);
   const [notes, setNotes] = useState("");
@@ -66,6 +67,20 @@ export function BrainstormingSessionForm() {
       {message ? <p className="mt-3 rounded-md bg-red-50 p-3 text-sm font-medium text-danger">{message}</p> : null}
     </section>
   );
+}
+
+function getIndiaDateKey() {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    })
+      .formatToParts(new Date())
+      .map((part) => [part.type, part.value])
+  );
+  return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
 function Field({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {

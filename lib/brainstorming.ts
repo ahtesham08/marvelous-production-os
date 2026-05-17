@@ -107,9 +107,14 @@ export async function getBrainstormingSession(sessionId: string) {
 
 export async function createBrainstormingSession(input: BrainstormingSessionInput, user: UserRecord | null) {
   const now = new Date().toISOString();
+  const sessionDate = normalizeDate(input.sessionDate) || now.slice(0, 10);
+  const existing = (await getBrainstormingSessions()).find((session) => session.session_date === sessionDate);
+  if (existing) {
+    throw new Error(`A brainstorming session already exists for ${sessionDate}. Open that session instead of creating another one.`);
+  }
   const record = {
     name: clean(input.name) || "Brainstorming Session",
-    session_date: input.sessionDate || now.slice(0, 10),
+    session_date: sessionDate,
     channels: normalizeList(input.channels),
     participants: normalizeList(input.participants),
     notes: clean(input.notes),
@@ -133,15 +138,60 @@ export async function createBrainstormingSession(input: BrainstormingSessionInpu
   return data as BrainstormingSession;
 }
 
+export async function deleteBrainstormingSession(sessionId: string) {
+  const existing = await getBrainstormingSession(sessionId);
+  if (!existing) throw new Error("Brainstorming session not found.");
+
+  if (!hasSupabaseAdminConfig()) {
+    const store = await readBrainstormingStore();
+    const titleIds = new Set(store.titles.filter((title) => title.session_id === sessionId).map((title) => title.id));
+    store.notes = store.notes.filter((note) => !note.brainstorming_title_id || !titleIds.has(note.brainstorming_title_id));
+    store.titles = store.titles.filter((title) => title.session_id !== sessionId);
+    store.sessions = store.sessions.filter((session) => session.id !== sessionId);
+    await writeBrainstormingStore(store);
+    return;
+  }
+
+  const supabase = createSupabaseAdminClient();
+  const { data: linkedTitles, error: linkedError } = await supabase
+    .from("brainstorming_titles")
+    .select("id")
+    .eq("session_id", sessionId);
+  if (linkedError && !isMissingBrainstormingTable(linkedError)) throw linkedError;
+  const linkedTitleIds = (linkedTitles ?? []).map((title) => title.id);
+
+  const { error: clearProductionError } = await supabase
+    .from("titles")
+    .update({ source_session_id: null, source_brainstorming_title_id: null, updated_at: new Date().toISOString() })
+    .or(
+      linkedTitleIds.length > 0
+        ? `source_session_id.eq.${sessionId},source_brainstorming_title_id.in.(${linkedTitleIds.join(",")})`
+        : `source_session_id.eq.${sessionId}`
+    );
+  if (clearProductionError) throw clearProductionError;
+
+  if (linkedTitleIds.length > 0) {
+    const { error: notesError } = await supabase
+      .from("brainstorming_discussion_notes")
+      .delete()
+      .in("brainstorming_title_id", linkedTitleIds);
+    if (notesError && !isMissingBrainstormingTable(notesError)) throw notesError;
+  }
+
+  const { error: titlesError } = await supabase.from("brainstorming_titles").delete().eq("session_id", sessionId);
+  if (titlesError && !isMissingBrainstormingTable(titlesError)) throw titlesError;
+
+  const { error: sessionError } = await supabase.from("brainstorming_sessions").delete().eq("id", sessionId);
+  if (sessionError) throw sessionError;
+}
+
 export async function ensureDailyBrainstormingSession(date = new Date()) {
   const today = getSessionDateParts(date);
   if (today.weekday === "Sunday") {
     return { created: false, skipped: true, reason: "Sunday", session: null };
   }
 
-  const existing = (await getBrainstormingSessions()).find(
-    (session) => session.session_date === today.date && session.status !== "Archived"
-  );
+  const existing = (await getBrainstormingSessions()).find((session) => session.session_date === today.date);
   if (existing) {
     return { created: false, skipped: false, reason: "Already exists", session: existing };
   }
