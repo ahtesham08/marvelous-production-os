@@ -17,6 +17,7 @@ type TitleTableProps = {
   initialChannel?: string;
   rottingOnly?: boolean;
   canDelete?: boolean;
+  canFocus?: boolean;
 };
 
 export function TitleTable({
@@ -24,7 +25,8 @@ export function TitleTable({
   initialSupervisor = "All",
   initialChannel = "All",
   rottingOnly = false,
-  canDelete = false
+  canDelete = false,
+  canFocus = false
 }: TitleTableProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -41,6 +43,7 @@ export function TitleTable({
   const [customEnd, setCustomEnd] = usePersistentFilter("end", "", searchParams);
   const [sortBy, setSortBy] = usePersistentFilter("sort", "age", searchParams);
   const [deleteMode, setDeleteMode] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [deleting, setDeleting] = useState(false);
 
@@ -117,6 +120,50 @@ export function TitleTable({
     setSelectedIds((current) => current.filter((id) => visibleIds.includes(id)));
   }, [visibleIds.join("|")]);
 
+  useEffect(() => {
+    document.body.classList.toggle("title-table-focus-mode", focusMode);
+    return () => document.body.classList.remove("title-table-focus-mode");
+  }, [focusMode]);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && focusMode) exitFocusMode();
+    }
+
+    function handleFullscreenChange() {
+      if (!document.fullscreenElement) setFocusMode(false);
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    };
+  }, [focusMode]);
+
+  async function enterFocusMode() {
+    setFocusMode(true);
+    try {
+      if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+        await document.documentElement.requestFullscreen();
+      }
+    } catch {
+      // App-level focus mode still works if browser fullscreen is blocked.
+    }
+  }
+
+  async function exitFocusMode() {
+    setFocusMode(false);
+    try {
+      if (document.fullscreenElement && document.exitFullscreen) {
+        await document.exitFullscreen();
+      }
+    } catch {
+      // Leaving app-level focus mode is enough if browser fullscreen exit fails.
+    }
+  }
+
   function enterDeleteMode() {
     setSelectedIds([]);
     setDeleteMode(true);
@@ -171,7 +218,23 @@ export function TitleTable({
   }
 
   return (
-    <div className="space-y-3">
+    <div className={focusMode ? "title-table-focus-surface space-y-3" : "space-y-3"}>
+      {focusMode ? (
+        <div className="sticky top-0 z-30 flex flex-col gap-2 rounded-lg border border-black/10 bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="text-sm font-semibold uppercase text-moss">Focus Mode</div>
+            <div className="text-lg font-semibold text-ink">Main Title Table</div>
+          </div>
+          <button
+            type="button"
+            onClick={exitFocusMode}
+            className="focus-ring rounded-md bg-ink px-3 py-2 text-sm font-semibold text-white hover:bg-moss"
+          >
+            Exit Full Screen
+          </button>
+        </div>
+      ) : null}
+
       <FiltersBar
         channels={channels}
         supervisors={supervisors}
@@ -195,8 +258,18 @@ export function TitleTable({
         onSearchChange={setSearch}
       />
 
-      {canDelete && !deleteMode ? (
-        <div className="flex justify-end">
+      {canFocus || (canDelete && !deleteMode) ? (
+        <div className="flex flex-wrap justify-end gap-2">
+          {canFocus ? (
+            <button
+              type="button"
+              onClick={focusMode ? exitFocusMode : enterFocusMode}
+              className="focus-ring rounded-md border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-ink hover:border-moss hover:text-moss"
+            >
+              {focusMode ? "Exit Full Screen" : "Full Screen"}
+            </button>
+          ) : null}
+          {canDelete && !deleteMode ? (
           <button
             type="button"
             onClick={enterDeleteMode}
@@ -204,6 +277,7 @@ export function TitleTable({
           >
             Delete Titles
           </button>
+          ) : null}
         </div>
       ) : null}
 

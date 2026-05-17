@@ -114,3 +114,32 @@ textarea {
 .dark tr:hover {
   background-color: rgba(246, 244, 238, 0.05) !important;
 }
+
+body.title-table-focus-mode > header,
+body.title-table-focus-mode aside,
+body.title-table-focus-mode [data-focus-chrome] {
+  display: none !important;
+}
+
+body.title-table-focus-mode {
+  overflow: auto;
+}
+
+body.title-table-focus-mode > div.lg\:flex {
+  display: block !important;
+}
+
+body.title-table-focus-mode main {
+  width: 100vw !important;
+  max-width: none !important;
+  min-height: 100vh;
+  padding: 12px !important;
+}
+
+.title-table-focus-surface {
+  min-height: calc(100vh - 24px);
+}
+
+.title-table-focus-surface table {
+  font-size: 13px;
+}
