@@ -40,6 +40,7 @@ export function TitleTable({
   const [customStart, setCustomStart] = usePersistentFilter("start", "", searchParams);
   const [customEnd, setCustomEnd] = usePersistentFilter("end", "", searchParams);
   const [sortBy, setSortBy] = usePersistentFilter("sort", "age", searchParams);
+  const [deleteMode, setDeleteMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [deleting, setDeleting] = useState(false);
 
@@ -116,6 +117,16 @@ export function TitleTable({
     setSelectedIds((current) => current.filter((id) => visibleIds.includes(id)));
   }, [visibleIds.join("|")]);
 
+  function enterDeleteMode() {
+    setSelectedIds([]);
+    setDeleteMode(true);
+  }
+
+  function exitDeleteMode() {
+    setSelectedIds([]);
+    setDeleteMode(false);
+  }
+
   function syncScroll(source: "top" | "table") {
     const from = source === "top" ? topScrollRef.current : tableScrollRef.current;
     const to = source === "top" ? tableScrollRef.current : topScrollRef.current;
@@ -155,6 +166,7 @@ export function TitleTable({
       return;
     }
     setSelectedIds([]);
+    setDeleteMode(false);
     router.refresh();
   }
 
@@ -183,19 +195,41 @@ export function TitleTable({
         onSearchChange={setSearch}
       />
 
-      {canDelete ? (
+      {canDelete && !deleteMode ? (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={enterDeleteMode}
+            className="focus-ring rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-danger hover:border-danger"
+          >
+            Delete Titles
+          </button>
+        </div>
+      ) : null}
+
+      {canDelete && deleteMode ? (
         <div className="flex flex-col gap-2 rounded-lg border border-black/10 bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm font-semibold text-ink">
             {selectedVisibleIds.length} selected
           </div>
-          <button
-            type="button"
-            disabled={selectedVisibleIds.length === 0 || deleting}
-            onClick={deleteSelected}
-            className="focus-ring rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-danger hover:border-danger disabled:opacity-50"
-          >
-            {deleting ? "Deleting" : "Delete Selected Titles"}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={selectedVisibleIds.length === 0 || deleting}
+              onClick={deleteSelected}
+              className="focus-ring rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-danger hover:border-danger disabled:opacity-50"
+            >
+              {deleting ? "Deleting" : "Delete Selected"}
+            </button>
+            <button
+              type="button"
+              disabled={deleting}
+              onClick={exitDeleteMode}
+              className="focus-ring rounded-md border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-ink hover:border-moss hover:text-moss disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       ) : null}
 
@@ -212,7 +246,7 @@ export function TitleTable({
           <table className="min-w-[1760px] divide-y divide-black/10 text-left text-sm">
             <thead className="bg-[#eef1eb] text-xs uppercase text-black/55">
               <tr>
-                {canDelete ? (
+                {canDelete && deleteMode ? (
                   <th className="w-12 px-4 py-3">
                     <input
                       type="checkbox"
@@ -241,7 +275,7 @@ export function TitleTable({
             <tbody className="divide-y divide-black/10">
               {filteredTitles.map((title) => (
                 <tr key={title.id} className="align-top hover:bg-[#faf9f5]">
-                  {canDelete ? (
+                  {canDelete && deleteMode ? (
                     <td className="px-4 py-3">
                       <input
                         type="checkbox"
