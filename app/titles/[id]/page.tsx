@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { FreshnessBadge } from "@/components/FreshnessBadge";
 import { MissingFieldsBadge } from "@/components/MissingFieldsBadge";
 import { PriorityBadge } from "@/components/PriorityBadge";
 import { SeverityBadge } from "@/components/SeverityBadge";
 import { StatusBadge } from "@/components/StatusBadge";
 import { DeleteTitleButton } from "@/components/title-detail/DeleteTitleButton";
 import { TitleUpdateForm } from "@/components/title-detail/TitleUpdateForm";
+import { getTitleFreshnessLabel } from "@/lib/adminAttention";
 import { getDashboardData } from "@/lib/dashboardData";
 import { getCurrentUserContext } from "@/lib/serverAuth";
 
@@ -42,6 +44,7 @@ export default async function TitleDetailPage({
               <StatusBadge status={title.status} />
               <PriorityBadge priority={title.priority} />
               <SeverityBadge severity={title.severity} />
+              <FreshnessBadge label={getTitleFreshnessLabel(title)} />
               {title.blocked ? (
                 <span className="rounded-md border border-danger/25 bg-red-50 px-2 py-1 text-xs font-semibold text-danger">
                   Blocked

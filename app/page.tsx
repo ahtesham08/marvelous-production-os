@@ -1,3 +1,4 @@
+import { AdminAttentionDashboard } from "@/components/AdminAttentionDashboard";
 import { DashboardCard } from "@/components/DashboardCard";
 import { DailyReportBox } from "@/components/DailyReportBox";
 import { FreshStartSections } from "@/components/FreshStartSections";
@@ -5,6 +6,7 @@ import { OperationsQueue } from "@/components/OperationsQueue";
 import { SupervisorBreakdown } from "@/components/SupervisorBreakdown";
 import { SyncButton } from "@/components/SyncButton";
 import { TitleTable } from "@/components/TitleTable";
+import { buildAdminAttentionDashboard } from "@/lib/adminAttention";
 import { getDashboardData } from "@/lib/dashboardData";
 import { getCurrentUserContext } from "@/lib/serverAuth";
 
@@ -13,6 +15,7 @@ export const dynamic = "force-dynamic";
 export default async function DashboardPage() {
   const [data, userContext] = await Promise.all([getDashboardData(), getCurrentUserContext()]);
   const canDelete = userContext.user?.role === "Admin" || userContext.user?.role === "Supervisor";
+  const attention = buildAdminAttentionDashboard(data.titles, userContext.user);
   const previewTitles = data.titles.slice(0, 25);
 
   return (
@@ -32,6 +35,8 @@ export default async function DashboardPage() {
         </div>
         <SyncButton />
       </section>
+
+      <AdminAttentionDashboard attention={attention} />
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {data.cards.map((card) => (

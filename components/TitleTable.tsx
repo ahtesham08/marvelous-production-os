@@ -4,9 +4,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { FiltersBar } from "@/components/FiltersBar";
+import { FreshnessBadge } from "@/components/FreshnessBadge";
 import { MissingFieldsBadge } from "@/components/MissingFieldsBadge";
 import { StatusBadge } from "@/components/StatusBadge";
 import { PriorityBadge } from "@/components/PriorityBadge";
+import { getTitleFreshnessLabel } from "@/lib/adminAttention";
 import { priorityRank } from "@/lib/sharedConstants";
 import { STATUS_VALUES, toIndiaDateKey } from "@/lib/statusRules";
 import type { EnrichedTitle } from "@/lib/types";
@@ -418,10 +420,10 @@ export function TitleTable({
           className="sticky top-0 z-10 overflow-x-auto border-b border-black/10 bg-white"
           aria-label="Top horizontal table scrollbar"
         >
-          <div className="h-4 min-w-[1760px]" />
+          <div className="h-4 min-w-[1860px]" />
         </div>
         <div ref={tableScrollRef} onScroll={() => syncScroll("table")} className="overflow-x-auto pb-2">
-          <table className="min-w-[1760px] divide-y divide-black/10 text-left text-sm">
+          <table className="min-w-[1860px] divide-y divide-black/10 text-left text-sm">
             <thead className="bg-[#eef1eb] text-xs uppercase text-black/55">
               <tr>
                 {canDelete && deleteMode ? (
@@ -444,6 +446,7 @@ export function TitleTable({
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Due Date</th>
                 <th className="px-4 py-3">Age</th>
+                <th className="px-4 py-3">Freshness</th>
                 <th className="px-4 py-3">VO</th>
                 <th className="px-4 py-3">Editor</th>
                 <th className="px-4 py-3">Proofreader</th>
@@ -499,6 +502,9 @@ export function TitleTable({
                   <td className="px-4 py-3">
                     <div className="font-semibold text-ink">{title.ageDays}d</div>
                     <div className="text-xs text-black/50">{title.ageBucket}</div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <FreshnessBadge label={getTitleFreshnessLabel(title)} />
                   </td>
                   <EditableTextCell
                     title={title}
