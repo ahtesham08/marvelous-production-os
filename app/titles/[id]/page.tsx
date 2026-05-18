@@ -34,11 +34,6 @@ export default async function TitleDetailPage({
         <Link href={returnPath || "/titles"} className="text-sm font-semibold text-moss hover:underline">
           Back to titles
         </Link>
-        {canDelete ? (
-          <div className="mt-3">
-            <DeleteTitleButton titleId={title.id} titleName={title.title} returnPath={returnPath || "/titles"} />
-          </div>
-        ) : null}
         <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase text-moss">{title.channel}</p>
@@ -108,6 +103,17 @@ export default async function TitleDetailPage({
               <p className="mt-4 text-sm text-black/50">No manual updates logged yet.</p>
             ) : null}
           </section>
+          {canDelete ? (
+            <section className="rounded-lg border border-red-200 bg-red-50 p-4 shadow-sm">
+              <h2 className="text-lg font-semibold text-danger">Danger Zone</h2>
+              <p className="mt-2 text-sm text-black/65">
+                Delete this production title only when it was added by mistake. Old Google Sheets will not be touched.
+              </p>
+              <div className="mt-4">
+                <DeleteTitleButton titleId={title.id} titleName={title.title} returnPath={returnPath || "/titles"} />
+              </div>
+            </section>
+          ) : null}
         </aside>
       </section>
     </div>

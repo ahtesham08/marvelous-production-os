@@ -21,6 +21,7 @@ type FiltersBarProps = {
   onCustomEndChange: (value: string) => void;
   onSortByChange: (value: string) => void;
   onSearchChange: (value: string) => void;
+  onClearFilters: () => void;
 };
 
 export function FiltersBar({
@@ -43,7 +44,8 @@ export function FiltersBar({
   onCustomStartChange,
   onCustomEndChange,
   onSortByChange,
-  onSearchChange
+  onSearchChange,
+  onClearFilters
 }: FiltersBarProps) {
   return (
     <div className="rounded-lg border border-black/10 bg-white p-3 shadow-sm">
@@ -121,7 +123,7 @@ export function FiltersBar({
         ))}
       </select>
       </div>
-      <div className="mt-3 grid gap-3 md:grid-cols-[180px_180px_180px_180px_1fr]">
+      <div className="mt-3 grid gap-3 md:grid-cols-[180px_180px_180px_180px_1fr_160px]">
         <select
           suppressHydrationWarning
           className="focus-ring rounded-md border border-black/15 px-3 py-2 text-sm"
@@ -165,6 +167,13 @@ export function FiltersBar({
         <div className="rounded-md bg-[#eef1eb] px-3 py-2 text-sm font-semibold text-moss">
           Date filter: {formatDateFilter(dateFilter, customStart, customEnd)} | {formatSort(sortBy)}
         </div>
+        <button
+          type="button"
+          onClick={onClearFilters}
+          className="focus-ring rounded-md border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-ink hover:border-moss hover:text-moss"
+        >
+          Clear All Filters
+        </button>
       </div>
     </div>
   );

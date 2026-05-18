@@ -8,6 +8,7 @@ export default async function TitlesPage() {
   const [data, userContext] = await Promise.all([getDashboardData(), getCurrentUserContext()]);
   const canDelete = userContext.user?.role === "Admin" || userContext.user?.role === "Supervisor";
   const canFocus = ["Admin", "Supervisor", "Operations Supervisor"].includes(String(userContext.user?.role));
+  const canEditInline = ["Admin", "Supervisor", "Operations Supervisor"].includes(String(userContext.user?.role));
 
   return (
     <div className="space-y-4">
@@ -18,7 +19,7 @@ export default async function TitlesPage() {
           Filter by supervisor, channel, title, status, age, and missing fields.
         </p>
       </div>
-      <TitleTable titles={data.titles} canDelete={canDelete} canFocus={canFocus} />
+      <TitleTable titles={data.titles} canDelete={canDelete} canFocus={canFocus} canEditInline={canEditInline} />
     </div>
   );
 }

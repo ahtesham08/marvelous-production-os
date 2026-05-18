@@ -8,7 +8,7 @@ import { MissingFieldsBadge } from "@/components/MissingFieldsBadge";
 import { StatusBadge } from "@/components/StatusBadge";
 import { PriorityBadge } from "@/components/PriorityBadge";
 import { priorityRank } from "@/lib/sharedConstants";
-import { toIndiaDateKey } from "@/lib/statusRules";
+import { STATUS_VALUES, toIndiaDateKey } from "@/lib/statusRules";
 import type { EnrichedTitle } from "@/lib/types";
 
 type TitleTableProps = {
@@ -18,6 +18,16 @@ type TitleTableProps = {
   rottingOnly?: boolean;
   canDelete?: boolean;
   canFocus?: boolean;
+  canEditInline?: boolean;
+};
+
+type InlineField = "voArtist" | "editor" | "proofreader" | "status";
+
+type InlineValues = Record<InlineField, string>;
+
+type InlineCell = {
+  id: string;
+  field: Exclude<InlineField, "status">;
 };
 
 export function TitleTable({
@@ -26,7 +36,8 @@ export function TitleTable({
   initialChannel = "All",
   rottingOnly = false,
   canDelete = false,
-  canFocus = false
+  canFocus = false,
+  canEditInline = false
 }: TitleTableProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -46,6 +57,10 @@ export function TitleTable({
   const [focusMode, setFocusMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [deleting, setDeleting] = useState(false);
+  const [editingCell, setEditingCell] = useState<InlineCell | null>(null);
+  const [draftValue, setDraftValue] = useState("");
+  const [savingCell, setSavingCell] = useState<string | null>(null);
+  const [inlineValues, setInlineValues] = useState<Record<string, Partial<InlineValues>>>({});
 
   const supervisors = useMemo(
     () =>
@@ -174,6 +189,94 @@ export function TitleTable({
     setDeleteMode(false);
   }
 
+  function clearAllFilters() {
+    setSearch("");
+    setSupervisor(initialSupervisor);
+    setChannel(initialChannel);
+    setStatus("All");
+    setPriority("All");
+    setDateFilter("All");
+    setCustomStart("");
+    setCustomEnd("");
+    setSortBy("age");
+    for (const key of ["q", "supervisor", "channel", "status", "priority", "date", "start", "end", "sort"]) {
+      window.localStorage.removeItem(`marvelous-title-table-${key}`);
+    }
+    router.replace(pathname, { scroll: false });
+  }
+
+  function startInlineEdit(title: EnrichedTitle, field: Exclude<InlineField, "status">) {
+    if (!canEditInline) return;
+    setEditingCell({ id: title.id, field });
+    setDraftValue(getInlineValue(title, field, inlineValues) || "");
+  }
+
+  function cancelInlineEdit() {
+    setEditingCell(null);
+    setDraftValue("");
+  }
+
+  async function saveInlineCell(title: EnrichedTitle, field: Exclude<InlineField, "status">) {
+    const cellKey = `${title.id}:${field}`;
+    setSavingCell(cellKey);
+    const body = {
+      production: {
+        [toProductionField(field)]: draftValue
+      }
+    };
+    const saved = await patchTitle(title.id, body);
+    setSavingCell(null);
+    if (!saved) return;
+    setInlineValues((current) => ({
+      ...current,
+      [title.id]: {
+        ...current[title.id],
+        [field]: draftValue
+      }
+    }));
+    cancelInlineEdit();
+    router.refresh();
+  }
+
+  async function saveStatus(title: EnrichedTitle, value: string) {
+    const previous = getInlineValue(title, "status", inlineValues) || title.status;
+    setInlineValues((current) => ({
+      ...current,
+      [title.id]: {
+        ...current[title.id],
+        status: value
+      }
+    }));
+    setSavingCell(`${title.id}:status`);
+    const saved = await patchTitle(title.id, { current_status: value });
+    setSavingCell(null);
+    if (!saved) {
+      setInlineValues((current) => ({
+        ...current,
+        [title.id]: {
+          ...current[title.id],
+          status: previous
+        }
+      }));
+      return;
+    }
+    router.refresh();
+  }
+
+  async function patchTitle(titleId: string, body: Record<string, unknown>) {
+    const response = await fetch(`/api/titles/${titleId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      alert(payload.error || "Could not save this title update.");
+      return false;
+    }
+    return true;
+  }
+
   function syncScroll(source: "top" | "table") {
     const from = source === "top" ? topScrollRef.current : tableScrollRef.current;
     const to = source === "top" ? tableScrollRef.current : topScrollRef.current;
@@ -256,6 +359,7 @@ export function TitleTable({
         sortBy={sortBy}
         onSortByChange={setSortBy}
         onSearchChange={setSearch}
+        onClearFilters={clearAllFilters}
       />
 
       {canFocus || (canDelete && !deleteMode) ? (
@@ -374,16 +478,70 @@ export function TitleTable({
                     <PriorityBadge priority={title.priority} />
                   </td>
                   <td className="px-4 py-3">
-                    <StatusBadge status={title.status} />
+                    {canEditInline ? (
+                      <select
+                        className="focus-ring w-44 rounded-md border border-black/15 bg-white px-2 py-1 text-sm text-ink"
+                        value={getInlineValue(title, "status", inlineValues) || title.status}
+                        disabled={savingCell === `${title.id}:status`}
+                        onChange={(event) => saveStatus(title, event.target.value)}
+                      >
+                        {STATUS_VALUES.map((value) => (
+                          <option key={value} value={value}>
+                            {value}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <StatusBadge status={title.status} />
+                    )}
                   </td>
                   <td className="px-4 py-3 text-black/70">{title.writerDueDate || "Not set"}</td>
                   <td className="px-4 py-3">
                     <div className="font-semibold text-ink">{title.ageDays}d</div>
                     <div className="text-xs text-black/50">{title.ageBucket}</div>
                   </td>
-                  <td className="px-4 py-3 text-black/70">{title.voArtist || "Not assigned"}</td>
-                  <td className="px-4 py-3 text-black/70">{title.editor || "Not assigned"}</td>
-                  <td className="px-4 py-3 text-black/70">{title.proofreader || "Not assigned"}</td>
+                  <EditableTextCell
+                    title={title}
+                    field="voArtist"
+                    label="VO"
+                    canEdit={canEditInline}
+                    editingCell={editingCell}
+                    draftValue={draftValue}
+                    savingCell={savingCell}
+                    inlineValues={inlineValues}
+                    onStartEdit={startInlineEdit}
+                    onDraftChange={setDraftValue}
+                    onSave={saveInlineCell}
+                    onCancel={cancelInlineEdit}
+                  />
+                  <EditableTextCell
+                    title={title}
+                    field="editor"
+                    label="Editor"
+                    canEdit={canEditInline}
+                    editingCell={editingCell}
+                    draftValue={draftValue}
+                    savingCell={savingCell}
+                    inlineValues={inlineValues}
+                    onStartEdit={startInlineEdit}
+                    onDraftChange={setDraftValue}
+                    onSave={saveInlineCell}
+                    onCancel={cancelInlineEdit}
+                  />
+                  <EditableTextCell
+                    title={title}
+                    field="proofreader"
+                    label="Proofreader"
+                    canEdit={canEditInline}
+                    editingCell={editingCell}
+                    draftValue={draftValue}
+                    savingCell={savingCell}
+                    inlineValues={inlineValues}
+                    onStartEdit={startInlineEdit}
+                    onDraftChange={setDraftValue}
+                    onSave={saveInlineCell}
+                    onCancel={cancelInlineEdit}
+                  />
                   <td className="px-4 py-3">
                     <MissingFieldsBadge fields={title.missingFields} />
                   </td>
@@ -398,6 +556,83 @@ export function TitleTable({
       </div>
     </div>
   );
+}
+
+function EditableTextCell({
+  title,
+  field,
+  label,
+  canEdit,
+  editingCell,
+  draftValue,
+  savingCell,
+  inlineValues,
+  onStartEdit,
+  onDraftChange,
+  onSave,
+  onCancel
+}: {
+  title: EnrichedTitle;
+  field: Exclude<InlineField, "status">;
+  label: string;
+  canEdit: boolean;
+  editingCell: InlineCell | null;
+  draftValue: string;
+  savingCell: string | null;
+  inlineValues: Record<string, Partial<InlineValues>>;
+  onStartEdit: (title: EnrichedTitle, field: Exclude<InlineField, "status">) => void;
+  onDraftChange: (value: string) => void;
+  onSave: (title: EnrichedTitle, field: Exclude<InlineField, "status">) => void;
+  onCancel: () => void;
+}) {
+  const cellKey = `${title.id}:${field}`;
+  const isEditing = editingCell?.id === title.id && editingCell.field === field;
+  const value = getInlineValue(title, field, inlineValues);
+
+  if (isEditing) {
+    return (
+      <td className="px-4 py-3">
+        <input
+          autoFocus
+          className="focus-ring w-44 rounded-md border border-black/15 bg-white px-2 py-1 text-sm text-ink"
+          aria-label={`Edit ${label}`}
+          value={draftValue}
+          disabled={savingCell === cellKey}
+          onChange={(event) => onDraftChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") onSave(title, field);
+            if (event.key === "Escape") onCancel();
+          }}
+          onBlur={onCancel}
+        />
+      </td>
+    );
+  }
+
+  return (
+    <td
+      className={canEdit ? "cursor-text px-4 py-3 text-black/70 hover:bg-[#eef1eb]" : "px-4 py-3 text-black/70"}
+      title={canEdit ? `Double-click to edit ${label}` : undefined}
+      onDoubleClick={() => onStartEdit(title, field)}
+    >
+      {savingCell === cellKey ? "Saving..." : value || "Not assigned"}
+    </td>
+  );
+}
+
+function getInlineValue(title: EnrichedTitle, field: InlineField, inlineValues: Record<string, Partial<InlineValues>>) {
+  const override = inlineValues[title.id]?.[field];
+  if (override !== undefined) return override;
+  if (field === "status") return title.status;
+  if (field === "voArtist") return title.voArtist ?? "";
+  if (field === "editor") return title.editor ?? "";
+  return title.proofreader ?? "";
+}
+
+function toProductionField(field: Exclude<InlineField, "status">) {
+  if (field === "voArtist") return "vo_artist";
+  if (field === "editor") return "editor_text";
+  return "proofreader_text";
 }
 
 function usePersistentFilter(key: string, fallback: string, searchParams: ReturnType<typeof useSearchParams>) {

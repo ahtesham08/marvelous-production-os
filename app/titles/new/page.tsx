@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 
 const channels = ["MV N", "LL", "Gamers", "Anime", "Long Reads"];
-const priorities = ["Normal", "Urgent", "High", "Low"];
+const priorities = ["Ultra Urgent", "Urgent", "Normal", "Low"];
 
 export default function NewTitlePage() {
   const router = useRouter();

@@ -268,14 +268,14 @@ export async function getBrainstormingTitles(options: { sessionId?: string; stat
         return Boolean(options.includeResurfaced && title.status === "Hold" && title.hold_until_date && title.hold_until_date <= today);
       })
       .filter((title) => !options.status || title.status === options.status)
-      .sort(sortTitles);
+      .sort(options.sessionId ? sortTitlesOldestFirst : sortTitles);
   }
 
   const supabase = createSupabaseAdminClient();
   let query = supabase
     .from("brainstorming_titles")
     .select("*, brainstorming_discussion_notes(*)")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: Boolean(options.sessionId) });
   if (options.sessionId && !options.includeResurfaced) query = query.eq("session_id", options.sessionId);
   if (options.status) query = query.eq("status", options.status);
   const { data, error } = await query;
@@ -300,7 +300,7 @@ export async function createBrainstormingTitle(input: BrainstormingTitleInput, u
 }
 
 export async function createBrainstormingTitles(inputs: BrainstormingTitleInput[], user: UserRecord | null) {
-  const now = new Date().toISOString();
+  const baseTime = Date.now();
   const cleanInputs = inputs.map(normalizeBrainstormingInput).filter((input) => input.title);
   if (cleanInputs.length === 0) throw new Error("Add at least one title idea.");
 
@@ -308,15 +308,18 @@ export async function createBrainstormingTitles(inputs: BrainstormingTitleInput[
 
   if (!hasSupabaseAdminConfig()) {
     const store = await readBrainstormingStore();
-    const created = cleanInputs.map((input) => toLocalBrainstormingTitle(input, user, now, warnings.get(normalizeTitle(input.title))));
+    const created = cleanInputs.map((input, index) =>
+      toLocalBrainstormingTitle(input, user, stableImportTimestamp(index, baseTime), warnings.get(normalizeTitle(input.title)))
+    );
     store.titles = [...created, ...store.titles];
     await writeBrainstormingStore(store);
     return created;
   }
 
   const supabase = createSupabaseAdminClient();
-  const rows = cleanInputs.map((input) => {
+  const rows = cleanInputs.map((input, index) => {
     const normalized = normalizeTitle(input.title);
+    const createdAt = stableImportTimestamp(index, baseTime);
     return {
       session_id: input.sessionId || null,
       title: input.title,
@@ -337,7 +340,8 @@ export async function createBrainstormingTitles(inputs: BrainstormingTitleInput[
       notes: input.notes,
       status: "Proposed",
       duplicate_warning: warnings.get(normalized) ?? null,
-      updated_at: now
+      created_at: createdAt,
+      updated_at: createdAt
     };
   });
 
@@ -771,6 +775,14 @@ function sortSessions(a: BrainstormingSession, b: BrainstormingSession) {
 
 function sortTitles(a: BrainstormingTitle, b: BrainstormingTitle) {
   return String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""));
+}
+
+function sortTitlesOldestFirst(a: BrainstormingTitle, b: BrainstormingTitle) {
+  return String(a.created_at ?? "").localeCompare(String(b.created_at ?? ""));
+}
+
+function stableImportTimestamp(index: number, baseTime: number) {
+  return new Date(baseTime + index).toISOString();
 }
 
 function clean(value: string | null | undefined) {
