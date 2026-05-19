@@ -5,6 +5,7 @@ import { STATUS_VALUES } from "@/lib/statusRules";
 import { createSupabaseAdminClient, hasSupabaseAdminConfig } from "@/lib/supabaseServer";
 import { normalizeTitle } from "@/lib/titleNormalizer";
 import { FRESH_START_CHANNELS, normalizePriorityLabel } from "@/lib/sharedConstants";
+import { createTitleAssignedNotification } from "@/lib/notifications";
 import type { ProductionDetail, TitleRecord, UserRecord } from "@/lib/types";
 
 export type TitleUpdatePayload = {
@@ -55,7 +56,7 @@ const titleBankHeaderAliases: Record<string, string[]> = {
   imported_writer_name: ["writer name", "writer"]
 };
 
-export async function updateTitle(titleId: string, payload: TitleUpdatePayload) {
+export async function updateTitle(titleId: string, payload: TitleUpdatePayload, user: UserRecord | null = null) {
   const existing = await getTitleRecord(titleId);
   const existingDetail = firstDetail(existing.production_details);
   const now = new Date().toISOString();
@@ -109,6 +110,19 @@ export async function updateTitle(titleId: string, payload: TitleUpdatePayload) 
       }))
     );
     if (error) throw error;
+  }
+
+  if (
+    titlePatch.imported_supervisor_name &&
+    titlePatch.imported_supervisor_name !== existing.imported_supervisor_name
+  ) {
+    await createTitleAssignedNotification({
+      titleId,
+      titleName: titlePatch.title ?? existing.title,
+      supervisorName: titlePatch.imported_supervisor_name,
+      priority: titlePatch.priority ?? existing.priority,
+      assignedBy: user
+    });
   }
 
   let writeBackResult: Awaited<ReturnType<typeof writeTitleBackToSheets>> | null = null;

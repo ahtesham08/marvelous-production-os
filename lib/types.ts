@@ -244,8 +244,14 @@ export type NotificationRecord = {
   brainstorming_title_id: string | null;
   session_id: string | null;
   type: string;
+  severity?: string | null;
   message: string;
   link_url: string | null;
+  action_url?: string | null;
+  dedupe_key?: string | null;
+  related_title_name?: string | null;
+  supervisor_name?: string | null;
+  due_date?: string | null;
   read_at: string | null;
   created_at: string | null;
 };

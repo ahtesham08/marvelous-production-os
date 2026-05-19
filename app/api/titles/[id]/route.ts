@@ -18,9 +18,10 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
 export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   const payload = (await request.json()) as TitleUpdatePayload;
+  const userContext = await getCurrentUserContext();
 
   try {
-    const result = await updateTitle(id, payload);
+    const result = await updateTitle(id, payload, userContext.user);
     return NextResponse.json(result);
   } catch (error) {
     return NextResponse.json(

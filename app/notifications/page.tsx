@@ -1,12 +1,14 @@
 import { NotificationsList } from "@/components/notifications/NotificationsList";
-import { getNotificationsForUser } from "@/lib/notifications";
+import { generateUserActionNotifications, getNotificationsForUser, getUnreadNotificationCount } from "@/lib/notifications";
 import { getCurrentUserContext } from "@/lib/serverAuth";
 
 export const dynamic = "force-dynamic";
 
 export default async function NotificationsPage() {
   const context = await getCurrentUserContext();
+  await generateUserActionNotifications(context.user);
   const notifications = await getNotificationsForUser(context.user, 50);
+  const unreadCount = await getUnreadNotificationCount(context.user);
 
   return (
     <div className="space-y-5">
@@ -19,7 +21,7 @@ export default async function NotificationsPage() {
       </section>
 
       <section className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
-        <NotificationsList notifications={notifications} />
+        <NotificationsList notifications={notifications} unreadCount={unreadCount} />
       </section>
     </div>
   );

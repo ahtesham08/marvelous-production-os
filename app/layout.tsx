@@ -3,7 +3,7 @@ import Link from "next/link";
 import Script from "next/script";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { getAppMode } from "@/lib/appMode";
-import { getNotificationsForUser } from "@/lib/notifications";
+import { generateUserActionNotifications, getUnreadNotificationCount } from "@/lib/notifications";
 import { getCurrentUserContext } from "@/lib/serverAuth";
 import "./globals.css";
 
@@ -46,8 +46,8 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const mode = getAppMode();
   const role = userContext.user?.role ?? (mode === "demo" ? "Admin" : "Viewer");
   const userName = userContext.user?.name ?? (userContext.authEmail || "Demo User");
-  const notifications = await getNotificationsForUser(userContext.user, 5);
-  const unreadCount = notifications.filter((notification) => !notification.read_at && !notification.id.startsWith("derived-")).length;
+  await generateUserActionNotifications(userContext.user);
+  const unreadCount = await getUnreadNotificationCount(userContext.user);
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -74,8 +74,8 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
             <div className="flex flex-wrap gap-2 text-xs font-semibold">
               <span className="rounded-md bg-ink px-2 py-1 text-white">{modeLabel(mode)}</span>
               <span className="rounded-md bg-white px-2 py-1 text-moss">{userName} | {role}</span>
-              <Link href="/notifications" className="rounded-md bg-white px-2 py-1 text-moss">
-                Notifications {unreadCount}
+              <Link href="/notifications" className={unreadCount > 0 ? "rounded-md bg-red-50 px-2 py-1 text-danger" : "rounded-md bg-white px-2 py-1 text-moss"}>
+                Notifications: {unreadCount} unread
               </Link>
             </div>
             <nav className="flex flex-wrap gap-2">
@@ -109,7 +109,11 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
             </div>
             <Link
               href="/notifications"
-              className="mt-2 block rounded-md border border-black/10 bg-white px-2 py-2 text-xs font-semibold text-moss transition hover:border-moss"
+              className={
+                unreadCount > 0
+                  ? "mt-2 block rounded-md border border-red-200 bg-red-50 px-2 py-2 text-xs font-semibold text-danger transition hover:border-danger"
+                  : "mt-2 block rounded-md border border-black/10 bg-white px-2 py-2 text-xs font-semibold text-moss transition hover:border-moss"
+              }
             >
               Notifications: {unreadCount} unread
             </Link>
