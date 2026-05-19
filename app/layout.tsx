@@ -3,7 +3,7 @@ import Link from "next/link";
 import Script from "next/script";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { getAppMode } from "@/lib/appMode";
-import { generateUserActionNotifications, getUnreadNotificationCount } from "@/lib/notifications";
+import { getUnreadNotificationCount } from "@/lib/notifications";
 import { getCurrentUserContext } from "@/lib/serverAuth";
 import "./globals.css";
 
@@ -46,7 +46,6 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const mode = getAppMode();
   const role = userContext.user?.role ?? (mode === "demo" ? "Admin" : "Viewer");
   const userName = userContext.user?.name ?? (userContext.authEmail || "Demo User");
-  await generateUserActionNotifications(userContext.user);
   const unreadCount = await getUnreadNotificationCount(userContext.user);
 
   return (
