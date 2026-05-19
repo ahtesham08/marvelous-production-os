@@ -22,6 +22,7 @@ const navItems = [
   { href: "/brainstorming/rework", label: "B. Rework" },
   { href: "/titles/new", label: "New Title" },
   { href: "/titles", label: "Titles" },
+  { href: "/titles/import-approved", label: "Import Approved" },
   { href: "/due-today", label: "Due Today" },
   { href: "/overdue", label: "Overdue" },
   { href: "/blocked", label: "Blocked" },
@@ -140,7 +141,12 @@ function modeLabel(mode: string) {
 function visibleNav(items: typeof navItems, role: string) {
   if (role === "Admin") return items;
   if (role === "Operations Supervisor") {
-    return items.filter((item) => !item.href.startsWith("/admin/users") && !item.href.includes("import-old-sheets"));
+    return items.filter(
+      (item) =>
+        !item.href.startsWith("/admin/users") &&
+        !item.href.includes("import-old-sheets") &&
+        item.href !== "/titles/import-approved"
+    );
   }
   if (role === "Supervisor") {
     return items.filter((item) => !adminPrefixes.some((prefix) => item.href.startsWith(prefix)) && !["/operations"].includes(item.href));

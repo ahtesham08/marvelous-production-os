@@ -88,6 +88,7 @@ export type TitleRecord = {
   match_status: string | null;
   sheet_write_back_status: string | null;
   sheet_write_back_at: string | null;
+  source_key: string | null;
   source_sheet_id: string | null;
   source_sheet_tab: string | null;
   source_row_number: number | null;

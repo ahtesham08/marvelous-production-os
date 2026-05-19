@@ -18,6 +18,12 @@ type LocalFreshInput = {
   helpDocUrl: string | null;
   dueDate: string | null;
   notes: string | null;
+  expectedWordCount?: number | null;
+  source?: string | null;
+  sourceKey?: string | null;
+  sourceRowNumber?: number | null;
+  activityAction?: string | null;
+  activityValue?: string | null;
 };
 
 type LocalTitlePatch = Partial<TitleRecord>;
@@ -61,9 +67,9 @@ export async function createLocalFreshTitles(inputs: LocalFreshInput[]) {
     const activity: ActivityLogEntry = {
       id: randomUUID(),
       title_id: id,
-      action: "Created approved title",
+      action: input.activityAction || "Created approved title",
       old_value: null,
-      new_value: "Fresh Start",
+      new_value: input.activityValue || "Fresh Start",
       performed_by: null,
       created_at: now
     };
@@ -73,11 +79,11 @@ export async function createLocalFreshTitles(inputs: LocalFreshInput[]) {
       title: input.title,
       normalized_title: normalizeTitle(input.title),
       priority: input.priority,
-      source: "Fresh Start Local",
+      source: input.source || "Fresh Start Local",
       approved_date: approvedDate,
       imported_supervisor_name: input.supervisor,
       imported_writer_name: input.writer,
-      expected_word_count: null,
+      expected_word_count: input.expectedWordCount ?? null,
       ahtesham_directives: null,
       help_doc_url: input.helpDocUrl,
       script_doc_url: null,
@@ -96,9 +102,10 @@ export async function createLocalFreshTitles(inputs: LocalFreshInput[]) {
       match_status: "Fresh Start",
       sheet_write_back_status: null,
       sheet_write_back_at: null,
+      source_key: input.sourceKey ?? null,
       source_sheet_id: null,
-      source_sheet_tab: null,
-      source_row_number: null,
+      source_sheet_tab: input.source ?? null,
+      source_row_number: input.sourceRowNumber ?? null,
       production_sheet_id: null,
       production_sheet_tab: null,
       production_row_number: null,
