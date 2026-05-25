@@ -20,7 +20,7 @@ export default async function ActivityPage() {
           {activity.map((entry) => (
             <li key={entry.id} className="border-l-2 border-moss/30 pl-3">
               <div className="text-sm font-semibold text-ink">{entry.action} - {entry.title}</div>
-              <div className="text-xs text-black/50">{entry.channel} | {entry.created_at ? new Date(entry.created_at).toLocaleString() : ""}</div>
+              <div className="text-xs text-black/50">{entry.channel} | {formatIstTimestamp(entry.created_at)}</div>
               <div className="text-xs text-black/60">{entry.old_value ?? "Blank"} {"->"} {entry.new_value ?? "Blank"}</div>
             </li>
           ))}
@@ -29,4 +29,20 @@ export default async function ActivityPage() {
       </section>
     </div>
   );
+}
+
+function formatIstTimestamp(value: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZoneName: "short"
+  }).format(date);
 }

@@ -76,11 +76,12 @@ export function TitleTable({
   const filteredTitles = useMemo(() => {
     const query = search.trim().toLowerCase();
     const range = getDateRange(dateFilter, customStart, customEnd);
+    const statusTokens = parseStatusTokens(status);
     return titles
       .filter((title) => !rottingOnly || title.severity === "Critical" || title.ageDays >= 8 || title.matchStatus === "Not Migrated")
       .filter((title) => supervisor === "All" || title.supervisor === supervisor)
       .filter((title) => channel === "All" || title.channel === channel)
-      .filter((title) => status === "All" || (status === "not-completed" ? title.status !== "Completed" : title.status === status))
+      .filter((title) => matchesStatusTokens(title, statusTokens))
       .filter((title) => priority === "All" || title.priority === priority)
       .filter((title) => {
         if (!range) return true;
@@ -237,7 +238,6 @@ export function TitleTable({
       }
     }));
     cancelInlineEdit();
-    router.refresh();
   }
 
   async function saveStatus(title: EnrichedTitle, value: string) {
@@ -262,7 +262,6 @@ export function TitleTable({
       }));
       return;
     }
-    router.refresh();
   }
 
   async function patchTitle(titleId: string, body: Record<string, unknown>) {
@@ -364,8 +363,17 @@ export function TitleTable({
         onClearFilters={clearAllFilters}
       />
 
-      {canFocus || (canDelete && !deleteMode) ? (
+      {canFocus || canEditInline || (canDelete && !deleteMode) ? (
         <div className="flex flex-wrap justify-end gap-2">
+          {canEditInline ? (
+            <button
+              type="button"
+              onClick={() => router.refresh()}
+              className="focus-ring rounded-md border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-ink hover:border-moss hover:text-moss"
+            >
+              Refresh Table
+            </button>
+          ) : null}
           {canFocus ? (
             <button
               type="button"
@@ -659,6 +667,30 @@ function usePersistentFilter(key: string, fallback: string, searchParams: Return
 function updateParam(params: URLSearchParams, key: string, value: string, fallback: string) {
   if (!value || value === fallback) params.delete(key);
   else params.set(key, value);
+}
+
+function parseStatusTokens(value: string) {
+  if (!value || value === "All") return [];
+  return value
+    .split(",")
+    .map((item) => decodeURIComponent(item).trim())
+    .filter(Boolean);
+}
+
+function matchesStatusTokens(title: EnrichedTitle, tokens: string[]) {
+  if (tokens.length === 0) return true;
+
+  const selectedStatuses = tokens.filter((token) => STATUS_VALUES.includes(token as never));
+  const statusMatches = selectedStatuses.length === 0 || selectedStatuses.includes(title.status);
+  const finalStatusMatches = !tokens.includes("not-completed") || !["Completed", "Cancelled"].includes(title.status);
+  const proofreaderMatches = !tokens.includes("proofreader-not-assigned") || isMissingAssignment(title.proofreader);
+
+  return statusMatches && finalStatusMatches && proofreaderMatches;
+}
+
+function isMissingAssignment(value: string | null | undefined) {
+  const cleaned = String(value ?? "").trim().toLowerCase();
+  return !cleaned || cleaned === "missing" || cleaned === "not assigned";
 }
 
 function getDateRange(filter: string, customStart: string, customEnd: string) {

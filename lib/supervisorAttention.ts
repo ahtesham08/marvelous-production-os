@@ -124,6 +124,7 @@ export async function buildSupervisorAttentionDashboard(input: {
 
   const topDangerousTitles = productionItems
     .filter((item) => !isCompletedItem(item))
+    .filter((item) => item.status !== "Editing In Progress")
     .map((item) => ({ ...item, score: dangerScore(item) }))
     .sort((a, b) => b.score - a.score)
     .slice(0, 10);
