@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo, useRef, useState } from "react";
 import { STATUS_VALUES } from "@/lib/statusRules";
 
 type FiltersBarProps = {
@@ -49,7 +50,28 @@ export function FiltersBar({
   onSearchChange,
   onClearFilters
 }: FiltersBarProps) {
+  const statusPopoverRef = useRef<HTMLDivElement>(null);
+  const [statusOpen, setStatusOpen] = useState(false);
   const selectedStatusTokens = parseStatusTokens(status);
+  const statusOptions = useMemo(() => ["not-completed", "proofreader-not-assigned", ...STATUS_VALUES, "Blocked"], []);
+  const statusSummary = formatStatusSummary(selectedStatusTokens);
+
+  useEffect(() => {
+    function handleMouseDown(event: MouseEvent) {
+      if (!statusPopoverRef.current?.contains(event.target as Node)) setStatusOpen(false);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setStatusOpen(false);
+    }
+
+    document.addEventListener("mousedown", handleMouseDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleMouseDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
 
   function toggleStatusToken(token: string, checked: boolean) {
     const next = new Set(selectedStatusTokens);
@@ -64,7 +86,7 @@ export function FiltersBar({
 
   return (
     <div className="rounded-lg border border-black/10 bg-white p-3 shadow-sm">
-      <div className="grid gap-3 md:grid-cols-[1fr_180px_180px_minmax(260px,1.2fr)_160px]">
+      <div className="grid gap-3 md:grid-cols-[1fr_180px_180px_220px_160px]">
       <input
         suppressHydrationWarning
         className="focus-ring rounded-md border border-black/15 px-3 py-2 text-sm"
@@ -98,54 +120,59 @@ export function FiltersBar({
           </option>
         ))}
       </select>
-      <div className="rounded-md border border-black/15 bg-white p-2 text-sm">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-xs font-semibold uppercase text-black/45">Status Filter</span>
-          <button
-            type="button"
-            onClick={() => onStatusChange("All")}
-            className="text-xs font-semibold text-moss hover:underline"
-          >
-            All statuses
-          </button>
-        </div>
-        <div className="mt-2 flex max-h-28 flex-wrap gap-2 overflow-y-auto pr-1">
-          <StatusCheckbox
-            label="All Except Completed"
-            checked={selectedStatusTokens.includes("not-completed")}
-            onChange={(checked) => toggleStatusToken("not-completed", checked)}
-          />
-          <StatusCheckbox
-            label="Proofreader Not Assigned"
-            checked={selectedStatusTokens.includes("proofreader-not-assigned")}
-            onChange={(checked) => toggleStatusToken("proofreader-not-assigned", checked)}
-          />
-          {STATUS_VALUES.map((name) => (
-            <StatusCheckbox
-              key={name}
-              label={name}
-              checked={selectedStatusTokens.includes(name)}
-              onChange={(checked) => toggleStatusToken(name, checked)}
-            />
-          ))}
-        </div>
-        <div className="mt-2 flex flex-wrap gap-1">
-          {selectedStatusTokens.length === 0 ? (
-            <span className="rounded-md bg-[#eef1eb] px-2 py-1 text-xs font-semibold text-moss">All statuses</span>
-          ) : (
-            selectedStatusTokens.map((token) => (
+      <div ref={statusPopoverRef} className="relative">
+        <button
+          type="button"
+          onClick={() => setStatusOpen((current) => !current)}
+          className="focus-ring flex h-full min-h-[42px] w-full items-center justify-between gap-2 rounded-md border border-black/15 bg-white px-3 py-2 text-left text-sm"
+          aria-expanded={statusOpen}
+          aria-haspopup="listbox"
+        >
+          <span className="min-w-0">
+            <span className="block text-xs font-semibold uppercase text-black/45">Status Filter</span>
+            <span className="block truncate font-medium text-ink">{statusSummary}</span>
+          </span>
+          <span className="shrink-0 text-xs font-semibold uppercase text-black/45">{statusOpen ? "Close" : "Open"}</span>
+        </button>
+
+        {statusOpen ? (
+          <div className="absolute left-0 top-[calc(100%+6px)] z-30 w-[min(360px,calc(100vw-2rem))] rounded-lg border border-black/10 bg-white p-3 shadow-lg">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-xs font-semibold uppercase text-black/45">Select statuses</div>
+                <div className="mt-1 text-xs text-black/55">{selectedStatusTokens.length === 0 ? "Showing all statuses" : statusSummary}</div>
+              </div>
               <button
                 type="button"
-                key={token}
-                onClick={() => clearStatusToken(token)}
-                className="rounded-md bg-[#eef1eb] px-2 py-1 text-xs font-semibold text-moss hover:bg-[#dde5d8]"
-                title={`Clear ${statusLabel(token)}`}
+                onClick={() => onStatusChange("All")}
+                className="text-xs font-semibold text-moss hover:underline"
               >
-                {statusLabel(token)} x
+                Clear
               </button>
-            ))
-          )}
-        </div>
+            </div>
+            <div className="mt-3 max-h-72 overflow-y-auto pr-1">
+              <div className="space-y-1">
+                {statusOptions.map((token) => (
+                  <StatusCheckbox
+                    key={token}
+                    label={statusLabel(token)}
+                    checked={selectedStatusTokens.includes(token)}
+                    onChange={(checked) => toggleStatusToken(token, checked)}
+                  />
+                ))}
+              </div>
+            </div>
+            <div className="mt-3 flex justify-end border-t border-black/10 pt-3">
+              <button
+                type="button"
+                onClick={() => setStatusOpen(false)}
+                className="focus-ring rounded-md bg-ink px-3 py-2 text-xs font-semibold text-white hover:bg-moss"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
       <select
         suppressHydrationWarning
@@ -217,7 +244,7 @@ export function FiltersBar({
 
 function StatusCheckbox({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
   return (
-    <label className="inline-flex items-center gap-1 rounded-md border border-black/10 px-2 py-1 text-xs font-semibold text-black/65">
+    <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm font-medium text-black/70 hover:bg-[#f6f4ee]">
       <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
       {label}
     </label>
@@ -241,6 +268,14 @@ function statusLabel(token: string) {
   if (token === "not-completed") return "All Except Completed";
   if (token === "proofreader-not-assigned") return "Proofreader Not Assigned";
   return token;
+}
+
+function formatStatusSummary(tokens: string[]) {
+  if (tokens.length === 0) return "All statuses";
+  const labels = tokens.map(statusLabel);
+  if (labels.length === 1) return labels[0];
+  if (labels.length === 2) return labels.join(", ");
+  return `${labels.slice(0, 2).join(", ")} +${labels.length - 2}`;
 }
 
 function formatSort(sortBy: string) {

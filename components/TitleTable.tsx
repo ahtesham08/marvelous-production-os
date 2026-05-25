@@ -680,8 +680,11 @@ function parseStatusTokens(value: string) {
 function matchesStatusTokens(title: EnrichedTitle, tokens: string[]) {
   if (tokens.length === 0) return true;
 
-  const selectedStatuses = tokens.filter((token) => STATUS_VALUES.includes(token as never));
-  const statusMatches = selectedStatuses.length === 0 || selectedStatuses.includes(title.status);
+  const selectedStatuses = tokens.filter((token) => STATUS_VALUES.includes(token as never) || token === "Blocked");
+  const statusMatches =
+    selectedStatuses.length === 0 ||
+    selectedStatuses.includes(title.status) ||
+    (selectedStatuses.includes("Blocked") && title.blocked);
   const finalStatusMatches = !tokens.includes("not-completed") || !["Completed", "Cancelled"].includes(title.status);
   const proofreaderMatches = !tokens.includes("proofreader-not-assigned") || isMissingAssignment(title.proofreader);
 
