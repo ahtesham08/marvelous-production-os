@@ -8,7 +8,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { DeleteTitleButton } from "@/components/title-detail/DeleteTitleButton";
 import { TitleUpdateForm } from "@/components/title-detail/TitleUpdateForm";
 import { getTitleFreshnessLabel } from "@/lib/adminAttention";
-import { getDashboardData } from "@/lib/dashboardData";
+import { getEnrichedTitleById } from "@/lib/dashboardData";
 import { getCurrentUserContext } from "@/lib/serverAuth";
 
 export const dynamic = "force-dynamic";
@@ -22,8 +22,7 @@ export default async function TitleDetailPage({
 }) {
   const { id } = await params;
   const { return: returnPath } = await searchParams;
-  const [data, userContext] = await Promise.all([getDashboardData(), getCurrentUserContext()]);
-  const title = data.titles.find((item) => item.id === id);
+  const [title, userContext] = await Promise.all([getEnrichedTitleById(id, { includeActivityLog: true }), getCurrentUserContext()]);
 
   if (!title) notFound();
   const canDelete =

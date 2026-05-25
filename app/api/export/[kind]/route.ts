@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(_request: NextRequest, context: { params: Promise<{ kind: string }> }) {
   const { kind } = await context.params;
-  const data = await getDashboardData();
+  const data = await getDashboardData({ includeActivityLog: kind === "activity" });
   const users = await getUsers();
   const csv = exportCsv(kind, data.titles, users);
   return new NextResponse(csv, {

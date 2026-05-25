@@ -14,7 +14,11 @@ import type {
   TitleRecord
 } from "@/lib/types";
 
-export async function getDashboardData(): Promise<DashboardData> {
+type DashboardDataOptions = {
+  includeActivityLog?: boolean;
+};
+
+export async function getDashboardData(options: DashboardDataOptions = {}): Promise<DashboardData> {
   if (!hasSupabaseAdminConfig()) {
     const titles = (await getLocalTitleRecords()).map(enrichTitle);
     return buildDashboard(
@@ -26,22 +30,41 @@ export async function getDashboardData(): Promise<DashboardData> {
   const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase
     .from("titles")
-    .select(
-      `
-      *,
-      channels(name),
-      production_details(*),
-      activity_log(*)
-    `
-    )
+    .select(titleSelect(options))
     .order("updated_at", { ascending: false });
 
   if (error) {
     return emptyDashboard(error.message);
   }
 
-  const titles = ((data ?? []) as TitleRecord[]).map(enrichTitle);
+  const titles = ((data ?? []) as unknown as TitleRecord[]).map(enrichTitle);
   return buildDashboard(titles);
+}
+
+export async function getEnrichedTitleById(titleId: string, options: DashboardDataOptions = {}) {
+  if (!hasSupabaseAdminConfig()) {
+    const titles = (await getLocalTitleRecords()).map(enrichTitle);
+    return titles.find((title) => title.id === titleId) ?? null;
+  }
+
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("titles")
+    .select(titleSelect(options))
+    .eq("id", titleId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ? enrichTitle(data as unknown as TitleRecord) : null;
+}
+
+function titleSelect(options: DashboardDataOptions) {
+  return `
+    *,
+    channels(name),
+    production_details(*)
+    ${options.includeActivityLog ? ", activity_log(*)" : ""}
+  `;
 }
 
 function buildDashboard(titles: EnrichedTitle[], setupWarning?: string): DashboardData {

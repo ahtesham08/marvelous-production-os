@@ -4,7 +4,7 @@ import { flattenActivity } from "@/lib/mvp3Views";
 export const dynamic = "force-dynamic";
 
 export default async function ActivityPage() {
-  const data = await getDashboardData();
+  const data = await getDashboardData({ includeActivityLog: true });
   const activity = flattenActivity(data.titles);
   return (
     <div className="space-y-5">
