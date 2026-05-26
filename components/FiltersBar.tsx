@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { PROOFREADING_STATUSES } from "@/lib/proofreadingConstants";
 import { STATUS_VALUES } from "@/lib/statusRules";
 
 type FiltersBarProps = {
@@ -53,7 +54,10 @@ export function FiltersBar({
   const statusPopoverRef = useRef<HTMLDivElement>(null);
   const [statusOpen, setStatusOpen] = useState(false);
   const selectedStatusTokens = parseStatusTokens(status);
-  const statusOptions = useMemo(() => ["not-completed", "proofreader-not-assigned", ...STATUS_VALUES, "Blocked"], []);
+  const statusOptions = useMemo(
+    () => ["not-completed", "proofreader-not-assigned", ...STATUS_VALUES, "Blocked", ...PROOFREADING_STATUSES.map((status) => `proofreading:${status}`)],
+    []
+  );
   const statusSummary = formatStatusSummary(selectedStatusTokens);
 
   useEffect(() => {
@@ -267,6 +271,7 @@ function encodeStatusTokens(tokens: string[]) {
 function statusLabel(token: string) {
   if (token === "not-completed") return "All Except Completed";
   if (token === "proofreader-not-assigned") return "Proofreader Not Assigned";
+  if (token.startsWith("proofreading:")) return token.replace("proofreading:", "");
   return token;
 }
 

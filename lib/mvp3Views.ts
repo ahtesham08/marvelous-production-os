@@ -53,6 +53,9 @@ export function operationsSections(titles: EnrichedTitle[]) {
     editorMissing: titles.filter((title) => Boolean(title.wordCount && title.voArtist && !title.editor)),
     proofreaderMissing: titles.filter((title) => Boolean(title.wordCount && title.voArtist && title.editor && !title.proofreader)),
     proofreadingPending: titles.filter((title) => title.status === "Proofreading Pending"),
+    proofreaderBlocked: titles.filter((title) => title.proofreadingBlocked || title.proofreadingStatus === "Blocked By Proofreader"),
+    readyForRecheck: titles.filter((title) => ["Fixed By Supervisor", "Ready For Recheck"].includes(title.proofreadingStatus)),
+    approvedByProofreader: titles.filter((title) => title.proofreadingStatus === "Approved By Proofreader"),
     editingPending: titles.filter((title) => title.status === "Editing Pending"),
     readyToComplete: titles.filter((title) => Boolean(title.wordCount && title.voArtist && title.editor && title.proofreader && title.status !== "Completed")),
     blockedProduction: titles.filter((title) => title.blocked && title.blockedCategory === "Production issue")

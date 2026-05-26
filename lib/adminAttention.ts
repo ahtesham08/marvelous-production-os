@@ -76,11 +76,18 @@ export function buildAdminAttentionDashboard(titles: EnrichedTitle[], user: User
   const waitingForAhteshamTitles = attentionTitles.filter((item) => isWaitingForAhtesham(item.title));
   const staleTitles = attentionTitles.filter((item) => hoursSinceUpdate(item.title) >= 48 && !isCompleted(item.title));
   const submittedButProductionMissing = attentionTitles.filter((item) => isSubmittedButProductionMissing(item.title));
+  const proofreaderBlocked = attentionTitles.filter((item) => item.title.proofreadingBlocked || item.title.proofreadingStatus === "Blocked By Proofreader");
+  const waitingSupervisorFix = attentionTitles.filter((item) => ["Blocked By Proofreader", "Changes Requested"].includes(item.title.proofreadingStatus));
+  const readyForRecheck = attentionTitles.filter((item) => ["Fixed By Supervisor", "Ready For Recheck"].includes(item.title.proofreadingStatus));
+  const proofreaderApprovedToday = attentionTitles.filter((item) => item.title.proofreadingStatus === "Approved By Proofreader" && isToday(item.title.lastUpdatedAt));
 
   const cards =
     roleView === "operations"
       ? [
           card("submittedButProductionMissing", "Scripts Submitted But Production Not Updated", submittedButProductionMissing, "Scripts are submitted, but production fields still need Deepak's update.", "high", "/titles?status=Script+Submitted"),
+          card("proofreadingPending", "Proofreading Pending", attentionTitles.filter((item) => item.title.status === "Proofreading Pending"), "Scripts waiting for proofreader movement.", "medium", "/titles?status=Proofreading+Pending"),
+          card("proofreaderBlocked", "Blocked By Proofreader", proofreaderBlocked, "Proofreader found script issues that should not move forward.", "high", "/titles?status=proofreading%3ABlocked%2520By%2520Proofreader"),
+          card("readyForRecheck", "Ready For Recheck", readyForRecheck, "Supervisor has responded and proofreader needs to recheck.", "medium", "/titles?status=proofreading%3AReady%2520For%2520Recheck"),
           card("wordCountMissing", "Word Count Missing", attentionTitles.filter((item) => item.title.missingFields.includes("Word Count")), "Scripts need word count before VO and editing can move.", "high", "/titles?q=Word+Count"),
           card("voMissing", "VO Missing", attentionTitles.filter((item) => item.title.missingFields.includes("VO")), "Word count exists but VO is not assigned yet.", "medium", "/titles?q=VO"),
           card("editorMissing", "Editor Missing", attentionTitles.filter((item) => item.title.missingFields.includes("Editor")), "Production needs an editor assignment.", "medium", "/titles?q=Editor"),
@@ -96,7 +103,11 @@ export function buildAdminAttentionDashboard(titles: EnrichedTitle[], user: User
           card("blockedTitles", "Blocked Titles", blockedTitles, "Blocked titles need a direct unblock decision.", "critical", "/blocked"),
           card("waitingForAhteshamTitles", "Waiting For Ahtesham Decision", waitingForAhteshamTitles, "Titles appear to need owner approval, hold resolution, or direction.", "high", "/titles?q=Ahtesham"),
           card("staleTitles", "Titles With No Update In 48 Hours", staleTitles, "These have not been touched recently and may be quietly slipping.", "medium", "/titles?sort=age"),
-          card("submittedButProductionMissing", "Scripts Submitted But Production Not Updated", submittedButProductionMissing, "Scripts are submitted, but word count/VO/editor/proofreader work is not fully updated.", "high", "/titles?status=Script+Submitted")
+          card("submittedButProductionMissing", "Scripts Submitted But Production Not Updated", submittedButProductionMissing, "Scripts are submitted, but word count/VO/editor/proofreader work is not fully updated.", "high", "/titles?status=Script+Submitted"),
+          card("proofreaderBlocked", "Scripts Blocked By Proofreaders", proofreaderBlocked, "Proofreaders marked these scripts as do-not-move-ahead.", "high", "/titles?status=proofreading%3ABlocked%2520By%2520Proofreader"),
+          card("waitingSupervisorFix", "Scripts Waiting For Supervisor Fix", waitingSupervisorFix, "Supervisor response is needed before proofreading can continue.", "high", "/titles?status=proofreading%3AChanges%2520Requested"),
+          card("readyForRecheck", "Scripts Ready For Proofreader Recheck", readyForRecheck, "Fixes are ready and need proofreader review.", "medium", "/titles?status=proofreading%3AReady%2520For%2520Recheck"),
+          card("proofreaderApprovedToday", "Proofreader Approved Today", proofreaderApprovedToday, "Scripts cleared by proofreaders today.", "low", "/titles?status=proofreading%3AApproved%2520By%2520Proofreader")
         ];
 
   const topDangerousItems = attentionTitles
@@ -213,6 +224,10 @@ function isDueToday(title: EnrichedTitle) {
   return !isCompleted(title) && Boolean(title.writerDueDate && toIndiaDateKey(title.writerDueDate) === todayKey());
 }
 
+function isToday(value: string | null) {
+  return Boolean(value && toIndiaDateKey(value) === todayKey());
+}
+
 function isSubmittedButProductionMissing(title: EnrichedTitle) {
   const submitted = title.status === "Script Submitted" || Boolean(title.scriptSubmittedAt);
   return submitted && ["Word Count", "VO", "Editor", "Proofreader"].some((field) => title.missingFields.includes(field));
@@ -226,6 +241,7 @@ function isWaitingForAhtesham(title: EnrichedTitle) {
 function problemLabel(title: EnrichedTitle) {
   const staleDays = Math.floor(hoursSinceUpdate(title) / 24);
   if (title.priority === "Ultra Urgent" && isOverdue(title)) return "Ultra Urgent and overdue";
+  if (title.proofreadingBlocked) return "Blocked by proofreader";
   if (title.blocked) return title.blockedCategory ? `Blocked: ${title.blockedCategory}` : "Blocked";
   if (isScriptDueMissed(title)) return `Script late by ${Math.max(1, overdueDays(title))} day${Math.max(1, overdueDays(title)) === 1 ? "" : "s"}`;
   if (title.missingFields.includes("Writer")) return "Writer not assigned";
@@ -274,10 +290,11 @@ function dangerScore(title: EnrichedTitle, attention: AttentionTitle) {
   const priorityScore = 400 - priorityRank(title.priority) * 80;
   const overdueScore = attention.daysDelayed * 20;
   const blockedScore = title.blocked ? 70 : 0;
+  const proofreadingBlockScore = title.proofreadingBlocked ? 95 : 0;
   const staleScore = Math.min(120, Math.floor(hoursSinceUpdate(title) / 12) * 10);
   const missingOwnerScore = title.missingFields.includes("Supervisor") || title.missingFields.includes("Writer") ? 55 : 0;
   const severityScore = attention.severity === "critical" ? 120 : attention.severity === "high" ? 80 : attention.severity === "medium" ? 40 : 0;
-  return priorityScore + overdueScore + blockedScore + staleScore + missingOwnerScore + severityScore;
+  return priorityScore + overdueScore + blockedScore + proofreadingBlockScore + staleScore + missingOwnerScore + severityScore;
 }
 
 function overdueDays(title: EnrichedTitle) {

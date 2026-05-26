@@ -5,10 +5,12 @@ import { MissingFieldsBadge } from "@/components/MissingFieldsBadge";
 import { PriorityBadge } from "@/components/PriorityBadge";
 import { SeverityBadge } from "@/components/SeverityBadge";
 import { StatusBadge } from "@/components/StatusBadge";
+import { ProofreadingReviewPanel } from "@/components/proofreading/ProofreadingReviewPanel";
 import { DeleteTitleButton } from "@/components/title-detail/DeleteTitleButton";
 import { TitleUpdateForm } from "@/components/title-detail/TitleUpdateForm";
 import { getTitleFreshnessLabel } from "@/lib/adminAttention";
 import { getEnrichedTitleById } from "@/lib/dashboardData";
+import { getProofreadingBundle } from "@/lib/proofreading";
 import { getCurrentUserContext } from "@/lib/serverAuth";
 
 export const dynamic = "force-dynamic";
@@ -22,12 +24,19 @@ export default async function TitleDetailPage({
 }) {
   const { id } = await params;
   const { return: returnPath } = await searchParams;
-  const [title, userContext] = await Promise.all([getEnrichedTitleById(id, { includeActivityLog: true }), getCurrentUserContext()]);
+  const [title, userContext] = await Promise.all([
+    getEnrichedTitleById(id, { includeActivityLog: true }),
+    getCurrentUserContext()
+  ]);
 
   if (!title) notFound();
+  const proofreading = await getProofreadingBundle(id);
   const canDelete =
     userContext.user?.role === "Admin" ||
     (userContext.user?.role === "Supervisor" && title.supervisor.toLowerCase() === userContext.user.name.toLowerCase());
+  const canUpdateProductionFields = ["Admin", "Supervisor", "Operations Supervisor"].includes(
+    userContext.user?.role ?? ""
+  );
 
   return (
     <div className="space-y-5">
@@ -67,7 +76,17 @@ export default async function TitleDetailPage({
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[1fr_360px]">
-        <TitleUpdateForm title={title} />
+        {canUpdateProductionFields ? (
+          <TitleUpdateForm title={title} />
+        ) : (
+          <section className="rounded-lg border border-black/10 bg-white p-5 shadow-sm">
+            <h2 className="text-xl font-semibold text-ink">Production Fields</h2>
+            <p className="mt-3 text-sm leading-6 text-black/65">
+              Production fields are read-only for your role. Use the Proofreading Review section below to add feedback,
+              screenshots, blocks, and approvals.
+            </p>
+          </section>
+        )}
         <aside className="space-y-4">
           <section className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
             <h2 className="text-lg font-semibold text-ink">Current Bottleneck</h2>
@@ -118,6 +137,12 @@ export default async function TitleDetailPage({
           ) : null}
         </aside>
       </section>
+      <ProofreadingReviewPanel
+        title={title}
+        initialReview={proofreading.review}
+        initialMessages={proofreading.messages}
+        user={userContext.user}
+      />
     </div>
   );
 }

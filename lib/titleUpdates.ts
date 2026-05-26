@@ -173,18 +173,36 @@ export async function getTitleRecord(titleId: string) {
   }
 
   const supabase = createSupabaseAdminClient();
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("titles")
     .select(
       `
       *,
       channels(name),
       production_details(*),
+      proofreading_reviews(*),
       activity_log(*)
     `
     )
     .eq("id", titleId)
     .single();
+
+  if (isMissingProofreadingRelation(error)) {
+    const fallback = await supabase
+      .from("titles")
+      .select(
+        `
+        *,
+        channels(name),
+        production_details(*),
+        activity_log(*)
+      `
+      )
+      .eq("id", titleId)
+      .single();
+    data = fallback.data;
+    error = fallback.error;
+  }
 
   if (error) throw error;
   return data as TitleRecord;
@@ -403,6 +421,11 @@ function validateTitleUpdate(title: Partial<TitleRecord>, detail: Partial<Produc
   if (status === "Completed" && (!writer || !wordCount || !voArtist || !editor || !proofreader)) {
     throw new Error("Completed requires writer, word count, VO, editor, and proofreader.");
   }
+
+  const review = Array.isArray(title.proofreading_reviews) ? title.proofreading_reviews[0] : title.proofreading_reviews;
+  if (status === "Completed" && review?.is_blocked) {
+    throw new Error("This title is blocked by proofreader. Submit a fix response and get proofreading approval before completing it.");
+  }
 }
 
 async function updateKnownRowFields(input: {
@@ -533,6 +556,13 @@ function canDeleteTitleRecord(record: TitleRecord, user: UserRecord | null) {
 
 function isMissingBrainstormingTable(error: { message?: string; code?: string }) {
   return error.code === "42P01" || String(error.message ?? "").includes("brainstorming_");
+}
+
+function isMissingProofreadingRelation(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const code = "code" in error ? String(error.code) : "";
+  const message = "message" in error ? String(error.message) : "";
+  return code === "PGRST200" || message.includes("proofreading_reviews") || message.includes("relationship");
 }
 
 function stringify(value: unknown) {

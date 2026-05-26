@@ -31,6 +31,9 @@ export default async function OperationsPage() {
       <section className="grid gap-3 md:grid-cols-4">
         {[
           ["Scripts submitted but word count missing", sections.wordCountMissing.length],
+          ["Proofreading pending", sections.proofreadingPending.length],
+          ["Blocked by proofreader", sections.proofreaderBlocked.length],
+          ["Ready for recheck", sections.readyForRecheck.length],
           ["Word count added but VO missing", sections.voMissing.length],
           ["VO assigned but editor missing", sections.editorMissing.length],
           ["Ready to mark completed", sections.readyToComplete.length]

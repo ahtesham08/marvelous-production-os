@@ -458,6 +458,7 @@ export function TitleTable({
                 <th className="px-4 py-3">VO</th>
                 <th className="px-4 py-3">Editor</th>
                 <th className="px-4 py-3">Proofreader</th>
+                <th className="px-4 py-3">Proofreading</th>
                 <th className="px-4 py-3">Missing</th>
               </tr>
             </thead>
@@ -556,6 +557,12 @@ export function TitleTable({
                     onSave={saveInlineCell}
                     onCancel={cancelInlineEdit}
                   />
+                  <td className="px-4 py-3">
+                    <span className={title.proofreadingBlocked ? "rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-semibold text-danger" : "rounded-md border border-black/10 bg-[#f6f4ee] px-2 py-1 text-xs font-semibold text-moss"}>
+                      {title.proofreadingStatus}
+                    </span>
+                    {title.proofreadingBlocked ? <div className="mt-1 text-xs font-semibold text-danger">Blocked By Proofreader</div> : null}
+                  </td>
                   <td className="px-4 py-3">
                     <MissingFieldsBadge fields={title.missingFields} />
                   </td>
@@ -681,14 +688,19 @@ function matchesStatusTokens(title: EnrichedTitle, tokens: string[]) {
   if (tokens.length === 0) return true;
 
   const selectedStatuses = tokens.filter((token) => STATUS_VALUES.includes(token as never) || token === "Blocked");
+  const selectedProofreadingStatuses = tokens
+    .filter((token) => token.startsWith("proofreading:"))
+    .map((token) => token.replace("proofreading:", ""));
   const statusMatches =
     selectedStatuses.length === 0 ||
     selectedStatuses.includes(title.status) ||
     (selectedStatuses.includes("Blocked") && title.blocked);
+  const proofreadingStatusMatches =
+    selectedProofreadingStatuses.length === 0 || selectedProofreadingStatuses.includes(title.proofreadingStatus);
   const finalStatusMatches = !tokens.includes("not-completed") || !["Completed", "Cancelled"].includes(title.status);
   const proofreaderMatches = !tokens.includes("proofreader-not-assigned") || isMissingAssignment(title.proofreader);
 
-  return statusMatches && finalStatusMatches && proofreaderMatches;
+  return statusMatches && proofreadingStatusMatches && finalStatusMatches && proofreaderMatches;
 }
 
 function isMissingAssignment(value: string | null | undefined) {

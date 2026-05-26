@@ -10,6 +10,7 @@ import type {
   EnrichedTitle,
   OperationsQueue,
   ProductionDetail,
+  ProofreadingReview,
   SupervisorSummary,
   TitleRecord
 } from "@/lib/types";
@@ -28,10 +29,19 @@ export async function getDashboardData(options: DashboardDataOptions = {}): Prom
   }
 
   const supabase = createSupabaseAdminClient();
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("titles")
     .select(titleSelect(options))
     .order("updated_at", { ascending: false });
+
+  if (isMissingProofreadingRelation(error)) {
+    const fallback = await supabase
+      .from("titles")
+      .select(titleSelect(options, { includeProofreading: false }))
+      .order("updated_at", { ascending: false });
+    data = fallback.data;
+    error = fallback.error;
+  }
 
   if (error) {
     return emptyDashboard(error.message);
@@ -48,23 +58,42 @@ export async function getEnrichedTitleById(titleId: string, options: DashboardDa
   }
 
   const supabase = createSupabaseAdminClient();
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("titles")
     .select(titleSelect(options))
     .eq("id", titleId)
     .maybeSingle();
 
+  if (isMissingProofreadingRelation(error)) {
+    const fallback = await supabase
+      .from("titles")
+      .select(titleSelect(options, { includeProofreading: false }))
+      .eq("id", titleId)
+      .maybeSingle();
+    data = fallback.data;
+    error = fallback.error;
+  }
+
   if (error) throw error;
   return data ? enrichTitle(data as unknown as TitleRecord) : null;
 }
 
-function titleSelect(options: DashboardDataOptions) {
+function titleSelect(options: DashboardDataOptions, relationOptions: { includeProofreading?: boolean } = {}) {
+  const includeProofreading = relationOptions.includeProofreading ?? true;
   return `
     *,
     channels(name),
     production_details(*)
+    ${includeProofreading ? ", proofreading_reviews(*)" : ""}
     ${options.includeActivityLog ? ", activity_log(*)" : ""}
   `;
+}
+
+function isMissingProofreadingRelation(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const code = "code" in error ? String(error.code) : "";
+  const message = "message" in error ? String(error.message) : "";
+  return code === "PGRST200" || message.includes("proofreading_reviews") || message.includes("relationship");
 }
 
 function buildDashboard(titles: EnrichedTitle[], setupWarning?: string): DashboardData {
@@ -158,6 +187,7 @@ function isThisWeekDate(value: string | null) {
 
 function enrichTitle(record: TitleRecord): EnrichedTitle {
   const detail = firstDetail(record.production_details);
+  const proofreadingReview = firstReview(record.proofreading_reviews);
   const ageDays = calculateAgeDays(record.approved_date, record.created_at);
   const channel = record.channels?.name || record.production_sheet_tab || "Unassigned";
   const supervisor = cleanName(record.imported_supervisor_name) || "Missing";
@@ -166,6 +196,7 @@ function enrichTitle(record: TitleRecord): EnrichedTitle {
   const voArtist = cleanName(detail?.vo_artist) || null;
   const editor = cleanName(detail?.editor_text) || null;
   const proofreader = cleanName(detail?.proofreader_text) || null;
+  const proofreadingStatus = proofreadingReview?.proofreading_status || (proofreader ? "Not Started" : "Not Assigned");
   const clipFinder = cleanName(detail?.clip_finder) || null;
   const productionStatus = cleanName(detail?.production_status) || cleanName(detail?.final_status) || null;
   const status = record.current_status || "Approved";
@@ -207,6 +238,12 @@ function enrichTitle(record: TitleRecord): EnrichedTitle {
     voArtist,
     editor,
     proofreader,
+    proofreadingStatus,
+    scriptQualityRating: proofreadingReview?.script_quality_rating ?? null,
+    proofreadingBlocked: Boolean(proofreadingReview?.is_blocked),
+    proofreadingBlockReason: proofreadingReview?.block_reason ?? null,
+    proofreadingLatestFeedback: proofreadingReview?.latest_feedback ?? null,
+    proofreadingLatestSupervisorResponse: proofreadingReview?.latest_supervisor_response ?? null,
     clipFinder,
     productionStatus,
     helpDocUrl: record.help_doc_url,
@@ -229,7 +266,8 @@ function enrichTitle(record: TitleRecord): EnrichedTitle {
       const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
       const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
       return bTime - aTime;
-    })
+    }),
+    proofreadingReview
   };
 
   const alerts = generateAlerts(base);
@@ -245,6 +283,11 @@ function enrichTitle(record: TitleRecord): EnrichedTitle {
 function firstDetail(details: ProductionDetail | ProductionDetail[] | null | undefined) {
   if (Array.isArray(details)) return details[0] ?? null;
   return details ?? null;
+}
+
+function firstReview(reviews: ProofreadingReview | ProofreadingReview[] | null | undefined) {
+  if (Array.isArray(reviews)) return reviews[0] ?? null;
+  return reviews ?? null;
 }
 
 function getMissingFields(input: {

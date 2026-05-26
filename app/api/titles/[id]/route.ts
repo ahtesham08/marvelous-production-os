@@ -20,6 +20,13 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
   const payload = (await request.json()) as TitleUpdatePayload;
   const userContext = await getCurrentUserContext();
 
+  if (userContext.user?.role === "Proofreader") {
+    return NextResponse.json(
+      { error: "Proofreaders can only update proofreading review fields." },
+      { status: 403 }
+    );
+  }
+
   try {
     const result = await updateTitle(id, payload, userContext.user);
     return NextResponse.json(result);

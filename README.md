@@ -512,3 +512,55 @@ supabase/migrations/008_in_app_notifications.sql
 ```
 
 Run these migrations before using the new brainstorming and notification routes in production.
+
+## Proofreading System
+
+Proofreaders now have a dedicated workflow for reviewing scripts, giving feedback, blocking bad scripts, and chatting with the assigned supervisor inside the title detail page.
+
+Routes:
+
+- `/dashboard/proofreader` - proofreader queue for assigned review work.
+- `/titles/[id]` - includes the Proofreading Review panel, chat, image upload, block/fix/recheck actions.
+- `/api/proofreading/[titleId]` - internal API for proofreading chat and status actions.
+
+Proofreader users:
+
+- Rubai
+- Ashmita
+- Mehek
+- Mansi
+
+Proofreading statuses:
+
+- Not Assigned
+- Not Started
+- In Review
+- Feedback Given
+- Changes Requested
+- Blocked By Proofreader
+- Fixed By Supervisor
+- Ready For Recheck
+- Approved By Proofreader
+
+Production safety:
+
+- Proofreaders can use proofreading feedback tools only.
+- Proofreaders cannot delete titles.
+- Proofreaders cannot edit production fields like supervisor, channel, priority, writer, VO, or editor.
+- A title blocked by a proofreader cannot be marked Completed until the proofreading block is resolved.
+- Blocking a script creates an in-app notification for the assigned supervisor.
+- Supervisor fix responses create an in-app notification for the assigned proofreader.
+
+New migration:
+
+```text
+supabase/migrations/010_proofreading_system.sql
+```
+
+Run this migration in Supabase before using proofreading in production. It creates:
+
+- `proofreading_reviews`
+- `proofreading_threads`
+- `proofreading_messages`
+- `proofreading_block_cycles`
+- Supabase Storage bucket: `proofreading-feedback`

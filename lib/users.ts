@@ -11,7 +11,11 @@ const seedUsers = [
   { name: "Kamran", role: "Supervisor" },
   { name: "Farhan", role: "Supervisor" },
   { name: "Raktim", role: "Supervisor" },
-  { name: "Deepak", role: "Operations Supervisor" }
+  { name: "Deepak", role: "Operations Supervisor" },
+  { name: "Rubai", role: "Proofreader" },
+  { name: "Ashmita", role: "Proofreader" },
+  { name: "Mehek", role: "Proofreader" },
+  { name: "Mansi", role: "Proofreader" }
 ];
 
 export async function getUsers() {

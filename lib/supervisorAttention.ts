@@ -23,6 +23,8 @@ export type SupervisorAttentionItem = {
   severity: SupervisorSeverity;
   href: string;
   missingFields: string[];
+  proofreadingStatus: string;
+  proofreadingBlocked: boolean;
 };
 
 export type SupervisorAttentionCard = {
@@ -104,6 +106,10 @@ export async function buildSupervisorAttentionDashboard(input: {
   const approvedNotStarted = productionItems.filter((item) => ["Approved", "Writer Pending"].includes(item.status));
   const rework = brainstormingItems.filter((item) => ["Needs Better Angle", "Needs Research"].includes(item.status));
   const heldResurfaced = brainstormingItems.filter((item) => item.status === "Hold" && item.dueDate && item.dueDate <= todayKey());
+  const proofreaderBlocked = productionItems.filter((item) => item.proofreadingBlocked || item.proofreadingStatus === "Blocked By Proofreader");
+  const waitingProofreaderFix = productionItems.filter((item) => item.proofreadingBlocked || ["Blocked By Proofreader", "Changes Requested"].includes(item.proofreadingStatus));
+  const readyForProofreaderRecheck = productionItems.filter((item) => ["Fixed By Supervisor", "Ready For Recheck"].includes(item.proofreadingStatus));
+  const proofreaderFeedback = productionItems.filter((item) => Boolean(item.proofreadingStatus && !["Not Assigned", "Not Started"].includes(item.proofreadingStatus)));
 
   const cards = [
     card("ultraUrgent", "Ultra Urgent Titles", ultraUrgent, "These are your highest-priority titles. Handle them first.", "critical"),
@@ -117,6 +123,10 @@ export async function buildSupervisorAttentionDashboard(input: {
     card("blocked", "Blocked Titles", blocked, "Blocked titles need unblock action or escalation.", "critical"),
     card("waitingForAhtesham", "Titles Waiting For Ahtesham Decision", waitingForAhtesham, "These need owner input or approval.", "high"),
     card("submittedNotMoved", "Scripts Submitted But Not Moved Forward", submittedNotMoved, "Scripts were submitted but production is not fully updated.", "high"),
+    card("proofreaderBlocked", "Titles Blocked By Proofreader", proofreaderBlocked, "Proofreader has marked these as do-not-move-ahead.", "critical"),
+    card("waitingProofreaderFix", "Titles Waiting For My Fix Response", waitingProofreaderFix, "Supervisor response is needed before proofreader can recheck.", "high"),
+    card("readyForProofreaderRecheck", "Titles Ready For Proofreader Recheck", readyForProofreaderRecheck, "Fixes were submitted and need proofreader recheck.", "medium"),
+    card("proofreaderFeedback", "Titles With Proofreader Feedback", proofreaderFeedback, "Proofreader has left feedback or a review state.", "medium"),
     card("approvedNotStarted", "Titles Approved But Not Started", approvedNotStarted, "Approved titles still need setup or writer movement.", "medium"),
     card("rework", "Rework Titles From Brainstorming", rework, "Brainstorming ideas that need a better angle or research.", "medium"),
     card("heldResurfaced", "Held Titles Resurfaced Today", heldResurfaced, "Held ideas are active again and should be reviewed.", "medium")
@@ -210,7 +220,9 @@ function toProductionItem(title: EnrichedTitle): SupervisorAttentionItem {
     problem,
     severity: severityForTitle(title, daysLate),
     href: `/titles/${title.id}?return=${encodeURIComponent("/dashboard/supervisor")}`,
-    missingFields: title.missingFields
+    missingFields: title.missingFields,
+    proofreadingStatus: title.proofreadingStatus,
+    proofreadingBlocked: title.proofreadingBlocked
   };
 }
 
@@ -231,7 +243,9 @@ function toBrainstormingItem(title: BrainstormingTitle): SupervisorAttentionItem
     problem: title.status === "Hold" ? "Held title resurfaced" : title.status,
     severity: title.status === "Hold" ? "medium" : "high",
     href,
-    missingFields: []
+    missingFields: [],
+    proofreadingStatus: title.status,
+    proofreadingBlocked: false
   };
 }
 
@@ -323,6 +337,7 @@ function action(label: string, card: SupervisorAttentionCard | undefined, fallba
 function productionProblem(title: EnrichedTitle, daysLate: number) {
   const hours = hoursSinceUpdate(title.lastUpdatedAt, title.ageDays);
   if (title.priority === "Ultra Urgent" && daysLate > 0) return "Ultra Urgent and overdue";
+  if (title.proofreadingBlocked) return "Blocked by proofreader";
   if (title.blocked) return title.blockedCategory ? `Blocked: ${title.blockedCategory}` : "Blocked title";
   if (title.missingFields.includes("Writer")) return "Writer not assigned";
   if (title.missingFields.includes("Help Doc")) return "Help doc missing";
@@ -351,11 +366,12 @@ function dangerScore(item: SupervisorAttentionItem) {
   const priorityScore = 400 - priorityRank(item.priority) * 80;
   const lateScore = item.daysLate * 25;
   const blockedScore = item.problem.includes("Blocked") ? 90 : 0;
+  const proofreadingScore = item.proofreadingBlocked ? 110 : 0;
   const missingWriterScore = item.missingFields.includes("Writer") ? 70 : 0;
   const missingHelpDocScore = item.missingFields.includes("Help Doc") ? 45 : 0;
   const noDueScore = item.dueDate ? 0 : 35;
   const severityScore = item.severity === "critical" ? 120 : item.severity === "high" ? 80 : item.severity === "medium" ? 40 : 0;
-  return priorityScore + lateScore + blockedScore + missingWriterScore + missingHelpDocScore + noDueScore + severityScore;
+  return priorityScore + lateScore + blockedScore + proofreadingScore + missingWriterScore + missingHelpDocScore + noDueScore + severityScore;
 }
 
 function hasProductionGap(item: SupervisorAttentionItem) {

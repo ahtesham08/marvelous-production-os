@@ -103,6 +103,7 @@ export type TitleRecord = {
   } | null;
   production_details?: ProductionDetail | ProductionDetail[] | null;
   activity_log?: ActivityLogEntry[] | null;
+  proofreading_reviews?: ProofreadingReview | ProofreadingReview[] | null;
 };
 
 export type ProductionDetail = {
@@ -256,6 +257,86 @@ export type NotificationRecord = {
   created_at: string | null;
 };
 
+export type ProofreadingStatus =
+  | "Not Assigned"
+  | "Not Started"
+  | "In Review"
+  | "Feedback Given"
+  | "Changes Requested"
+  | "Blocked By Proofreader"
+  | "Fixed By Supervisor"
+  | "Ready For Recheck"
+  | "Approved By Proofreader";
+
+export type ScriptQualityRating =
+  | "Excellent"
+  | "Good"
+  | "Needs Minor Fixes"
+  | "Needs Major Fixes"
+  | "Poor"
+  | "Unusable";
+
+export type ProofreadingReview = {
+  id: string;
+  title_id: string;
+  proofreader_id: string | null;
+  proofreader_name: string | null;
+  proofreading_status: ProofreadingStatus | string;
+  script_quality_rating: ScriptQualityRating | string | null;
+  latest_feedback: string | null;
+  latest_supervisor_response: string | null;
+  is_blocked: boolean;
+  blocked_at: string | null;
+  blocked_by: string | null;
+  blocked_by_name: string | null;
+  block_category: string | null;
+  block_reason: string | null;
+  what_needs_fixing: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type ProofreadingThread = {
+  id: string;
+  title_id: string;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type ProofreadingMessage = {
+  id: string;
+  thread_id: string;
+  title_id: string;
+  sender_id: string | null;
+  sender_name: string | null;
+  sender_role: string | null;
+  message_text: string | null;
+  attachment_url: string | null;
+  attachment_type: string | null;
+  created_at: string | null;
+  edited_at: string | null;
+  deleted_at: string | null;
+};
+
+export type ProofreadingBlockCycle = {
+  id: string;
+  title_id: string;
+  proofreader_id: string | null;
+  proofreader_name: string | null;
+  supervisor_id: string | null;
+  supervisor_name: string | null;
+  block_category: string;
+  block_reason: string;
+  proofreader_feedback: string | null;
+  what_needs_fixing: string | null;
+  supervisor_fix_response: string | null;
+  supervisor_fixed_at: string | null;
+  recheck_status: string | null;
+  final_resolution: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
 export type EnrichedTitle = {
   id: string;
   title: string;
@@ -281,6 +362,12 @@ export type EnrichedTitle = {
   voArtist: string | null;
   editor: string | null;
   proofreader: string | null;
+  proofreadingStatus: string;
+  scriptQualityRating: string | null;
+  proofreadingBlocked: boolean;
+  proofreadingBlockReason: string | null;
+  proofreadingLatestFeedback: string | null;
+  proofreadingLatestSupervisorResponse: string | null;
   clipFinder: string | null;
   productionStatus: string | null;
   helpDocUrl: string | null;
@@ -300,6 +387,7 @@ export type EnrichedTitle = {
   sheetWriteBackStatus: string | null;
   sheetWriteBackAt: string | null;
   activityLog?: ActivityLogEntry[];
+  proofreadingReview?: ProofreadingReview | null;
 };
 
 export type SupervisorSummary = {
