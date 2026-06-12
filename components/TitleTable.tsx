@@ -11,6 +11,7 @@ import { PriorityBadge } from "@/components/PriorityBadge";
 import { getTitleFreshnessLabel } from "@/lib/adminAttention";
 import { priorityRank } from "@/lib/sharedConstants";
 import { STATUS_VALUES, toIndiaDateKey } from "@/lib/statusRules";
+import { matchesTitleSearch, titleSearchScore } from "@/lib/titleSearch";
 import type { EnrichedTitle } from "@/lib/types";
 
 type TitleTableProps = {
@@ -74,7 +75,7 @@ export function TitleTable({
   const channels = useMemo(() => Array.from(new Set(titles.map((title) => title.channel).filter(Boolean))).sort(), [titles]);
 
   const filteredTitles = useMemo(() => {
-    const query = search.trim().toLowerCase();
+    const query = search.trim();
     const range = getDateRange(dateFilter, customStart, customEnd);
     const statusTokens = parseStatusTokens(status);
     return titles
@@ -90,26 +91,9 @@ export function TitleTable({
       })
       .filter((title) => {
         if (!query) return true;
-        return [
-          title.title,
-          title.channel,
-          title.supervisor,
-          title.writer,
-          title.priority,
-          title.status,
-          title.expectedWordCount,
-          title.wordCount,
-          title.voArtist,
-          title.editor,
-          title.proofreader,
-          title.matchStatus,
-          title.missingFields.join(" ")
-        ]
-          .join(" ")
-          .toLowerCase()
-          .includes(query);
+        return matchesTitleSearch(title, query);
       })
-      .sort((a, b) => compareTitles(a, b, sortBy));
+      .sort((a, b) => compareTitles(a, b, sortBy, query));
   }, [channel, customEnd, customStart, dateFilter, priority, rottingOnly, search, sortBy, status, supervisor, titles]);
 
   useEffect(() => {
@@ -748,7 +732,11 @@ function parseDateKey(value: string) {
   return new Date(`${value}T00:00:00`);
 }
 
-function compareTitles(a: EnrichedTitle, b: EnrichedTitle, sortBy: string) {
+function compareTitles(a: EnrichedTitle, b: EnrichedTitle, sortBy: string, searchQuery = "") {
+  if (searchQuery.trim()) {
+    const bySearch = titleSearchScore(b, searchQuery) - titleSearchScore(a, searchQuery);
+    if (bySearch !== 0) return bySearch;
+  }
   if (sortBy === "priority") {
     const byPriority = priorityRank(a.priority) - priorityRank(b.priority);
     if (byPriority !== 0) return byPriority;
