@@ -15,10 +15,12 @@ export default async function LiveBrainstormingPage({ params }: PageProps) {
   const session = await getBrainstormingSession(sessionId);
   if (!session) notFound();
   await attachOrphanBrainstormingTitlesToSession(session);
-  const [titles, context] = await Promise.all([
+  const [titles, proposedTitles, context] = await Promise.all([
     getBrainstormingTitles({ sessionId, includeResurfaced: true }),
+    getBrainstormingTitles({ status: "Proposed" }),
     getCurrentUserContext()
   ]);
+  const recoveryTitles = proposedTitles.filter((title) => title.session_id !== sessionId);
 
   return (
     <div className="space-y-5">
@@ -36,6 +38,7 @@ export default async function LiveBrainstormingPage({ params }: PageProps) {
       <LiveMeetingClient
         session={session}
         titles={titles}
+        recoveryTitles={recoveryTitles}
         canDecide={isAdmin(context.user?.role)}
         canEdit={["Admin", "Supervisor"].includes(String(context.user?.role))}
       />

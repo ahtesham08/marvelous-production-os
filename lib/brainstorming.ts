@@ -213,6 +213,41 @@ export async function attachOrphanBrainstormingTitlesToSession(session: Brainsto
   if (error && !isMissingBrainstormingTable(error)) throw error;
 }
 
+export async function attachBrainstormingTitlesToSession(sessionId: string, titleIds: string[]) {
+  const ids = Array.from(new Set(titleIds.filter(Boolean)));
+  if (ids.length === 0) throw new Error("Select at least one proposed title.");
+  const session = await getBrainstormingSession(sessionId);
+  if (!session) throw new Error("Brainstorming session not found.");
+
+  const now = new Date().toISOString();
+  if (!hasSupabaseAdminConfig()) {
+    const store = await readBrainstormingStore();
+    const idSet = new Set(ids);
+    store.titles = store.titles.map((title) =>
+      idSet.has(title.id) && title.status === "Proposed" ? { ...title, session_id: sessionId, updated_at: now } : title
+    );
+    await writeBrainstormingStore(store);
+    return attachNotes(store.titles.filter((title) => idSet.has(title.id) && title.session_id === sessionId), store.notes);
+  }
+
+  const supabase = createSupabaseAdminClient();
+  const { error } = await supabase
+    .from("brainstorming_titles")
+    .update({ session_id: sessionId, updated_at: now })
+    .in("id", ids)
+    .eq("status", "Proposed");
+  if (error && !isMissingBrainstormingTable(error)) throw error;
+
+  const { data, error: fetchError } = await supabase
+    .from("brainstorming_titles")
+    .select("*, brainstorming_discussion_notes(*)")
+    .in("id", ids)
+    .eq("session_id", sessionId);
+  if (fetchError && isMissingBrainstormingTable(fetchError)) return [];
+  if (fetchError) throw fetchError;
+  return (data ?? []) as BrainstormingTitle[];
+}
+
 export async function ensureDailyBrainstormingSession(date = new Date()) {
   const today = getSessionDateParts(date);
   if (today.weekday === "Sunday") {
