@@ -10,13 +10,11 @@ import type { BrainstormingSession, BrainstormingTitle } from "@/lib/types";
 export function LiveMeetingClient({
   session,
   titles,
-  recoveryTitles,
   canDecide,
   canEdit
 }: {
   session: BrainstormingSession;
   titles: BrainstormingTitle[];
-  recoveryTitles?: BrainstormingTitle[];
   canDecide: boolean;
   canEdit: boolean;
 }) {
@@ -26,9 +24,6 @@ export function LiveMeetingClient({
   const [sessionName, setSessionName] = useState(session.name);
   const [renaming, setRenaming] = useState(false);
   const [localTitles, setLocalTitles] = useState(titles);
-  const [localRecoveryTitles, setLocalRecoveryTitles] = useState(recoveryTitles ?? []);
-  const [selectedRecoveryIds, setSelectedRecoveryIds] = useState<string[]>([]);
-  const [recovering, setRecovering] = useState(false);
   const [approvalSettings, setApprovalSettings] = useState(() => buildApprovalSettings(titles));
   const [supervisorFilter, setSupervisorFilter] = useState("All");
 
@@ -36,10 +31,8 @@ export function LiveMeetingClient({
     setLocalSession(session);
     setSessionName(session.name);
     setLocalTitles(titles);
-    setLocalRecoveryTitles(recoveryTitles ?? []);
-    setSelectedRecoveryIds([]);
     setApprovalSettings((current) => ({ ...buildApprovalSettings(titles), ...current }));
-  }, [session, titles, recoveryTitles]);
+  }, [session, titles]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, BrainstormingTitle[]>();
@@ -111,28 +104,6 @@ export function LiveMeetingClient({
     }
     setLocalSession(payload.session);
     setSessionName(payload.session.name);
-  }
-
-  async function attachSelectedRecoveryTitles() {
-    if (selectedRecoveryIds.length === 0) return;
-    setRecovering(true);
-    const response = await fetch("/api/brainstorming/titles", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "attach-to-session", sessionId: localSession.id, titleIds: selectedRecoveryIds })
-    });
-    const payload = await response.json().catch(() => ({}));
-    setRecovering(false);
-    if (!response.ok) {
-      alert(payload.error || "Could not attach selected title bank items.");
-      return;
-    }
-    const attached = (payload.titles ?? []) as BrainstormingTitle[];
-    setLocalTitles((current) => mergeTitles(current, attached));
-    setLocalRecoveryTitles((current) => current.filter((title) => !selectedRecoveryIds.includes(title.id)));
-    setSelectedRecoveryIds([]);
-    setApprovalSettings((current) => ({ ...buildApprovalSettings(attached), ...current }));
-    router.refresh();
   }
 
   function updateApprovalSetting(id: string, patch: Partial<ApprovalSetting>) {
@@ -421,48 +392,6 @@ export function LiveMeetingClient({
           </div>
         </section>
       ))}
-      {canEdit && localRecoveryTitles.length > 0 ? (
-        <section className="rounded-lg border border-amberline/40 bg-[#fff8ec] p-4 shadow-sm">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <h2 className="text-xl font-semibold text-ink">Proposed Titles Outside This Session</h2>
-              <p className="mt-1 text-sm text-black/65">
-                These are Proposed title-bank items that are not attached to this Live Review session. Select the missing titles and pull them into this session.
-              </p>
-            </div>
-            <button
-              type="button"
-              disabled={recovering || selectedRecoveryIds.length === 0}
-              onClick={attachSelectedRecoveryTitles}
-              className="focus-ring rounded-md bg-ink px-3 py-2 text-sm font-semibold text-white hover:bg-moss disabled:opacity-60"
-            >
-              {recovering ? "Attaching" : `Attach Selected (${selectedRecoveryIds.length})`}
-            </button>
-          </div>
-          <div className="mt-4 max-h-80 overflow-y-auto rounded-md border border-black/10 bg-white">
-            {localRecoveryTitles.slice(0, 80).map((title) => (
-              <label key={title.id} className="flex cursor-pointer items-start gap-3 border-b border-black/10 px-3 py-3 last:border-b-0 hover:bg-[#f6f4ee]">
-                <input
-                  type="checkbox"
-                  className="mt-1"
-                  checked={selectedRecoveryIds.includes(title.id)}
-                  onChange={(event) => {
-                    setSelectedRecoveryIds((current) =>
-                      event.target.checked ? [...current, title.id] : current.filter((id) => id !== title.id)
-                    );
-                  }}
-                />
-                <span className="min-w-0">
-                  <span className="block font-semibold text-ink">{title.title}</span>
-                  <span className="mt-1 block text-xs text-black/55">
-                    {title.supervisor || title.submitted_by_name || "Unassigned"} | {title.channel || "MV N"} | {title.priority || "Normal"} | {title.created_at ? new Date(title.created_at).toLocaleString() : "No date"}
-                  </span>
-                </span>
-              </label>
-            ))}
-          </div>
-        </section>
-      ) : null}
       {localTitles.length === 0 ? (
         <section className="rounded-lg border border-black/10 bg-white p-8 text-center">
           <X className="mx-auto text-black/40" />
@@ -499,12 +428,6 @@ function buildApprovalSetting(title: BrainstormingTitle | undefined): ApprovalSe
     titleText: title?.title || "",
     directives: title?.ahtesham_notes || ""
   };
-}
-
-function mergeTitles(current: BrainstormingTitle[], incoming: BrainstormingTitle[]) {
-  const byId = new Map(current.map((title) => [title.id, title]));
-  for (const title of incoming) byId.set(title.id, title);
-  return Array.from(byId.values()).sort((a, b) => String(a.created_at ?? "").localeCompare(String(b.created_at ?? "")));
 }
 
 function getVisibleTitles(titles: BrainstormingTitle[], supervisorFilter: string) {
