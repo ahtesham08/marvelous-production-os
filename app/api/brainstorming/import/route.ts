@@ -18,6 +18,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ preview });
     }
     const titles = (payload.titles ?? []) as Parameters<typeof createBrainstormingTitles>[0];
+    if (titles.length === 0) {
+      return NextResponse.json({ error: "Preview at least one title before importing." }, { status: 400 });
+    }
+    if (titles.some((title) => !title.sessionId)) {
+      return NextResponse.json({ error: "Choose a brainstorming session before importing titles." }, { status: 400 });
+    }
     const created = await createBrainstormingTitles(titles, context.user);
     return NextResponse.json({ created });
   } catch (error) {

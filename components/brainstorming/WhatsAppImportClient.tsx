@@ -16,16 +16,26 @@ type Row = {
   duplicateWarning?: string | null;
 };
 
-export function WhatsAppImportClient({ sessions }: { sessions: BrainstormingSession[] }) {
+export function WhatsAppImportClient({
+  sessions,
+  initialSessionId
+}: {
+  sessions: BrainstormingSession[];
+  initialSessionId?: string;
+}) {
   const router = useRouter();
   const [text, setText] = useState("");
-  const [sessionId, setSessionId] = useState(sessions[0]?.id ?? "");
+  const [sessionId, setSessionId] = useState(initialSessionId ?? sessions[0]?.id ?? "");
   const [preview, setPreview] = useState<Row[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   async function previewImport() {
     setMessage(null);
+    if (!sessionId) {
+      setMessage("Choose a brainstorming session before previewing imported titles.");
+      return;
+    }
     const response = await fetch("/api/brainstorming/import", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -40,6 +50,10 @@ export function WhatsAppImportClient({ sessions }: { sessions: BrainstormingSess
   }
 
   async function saveImport() {
+    if (!sessionId) {
+      setMessage("Choose a brainstorming session before adding imported titles.");
+      return;
+    }
     setSaving(true);
     setMessage(null);
     const response = await fetch("/api/brainstorming/import", {
@@ -81,7 +95,7 @@ export function WhatsAppImportClient({ sessions }: { sessions: BrainstormingSess
           <label>
             <span className="text-xs font-semibold uppercase text-black/55">Session</span>
             <select className="field-input mt-1" value={sessionId} onChange={(event) => setSessionId(event.target.value)}>
-              <option value="">No session</option>
+              <option value="">Choose a session</option>
               {sessions.map((session) => (
                 <option key={session.id} value={session.id}>{session.name}</option>
               ))}

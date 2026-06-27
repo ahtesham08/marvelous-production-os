@@ -185,6 +185,34 @@ export async function deleteBrainstormingSession(sessionId: string) {
   if (sessionError) throw sessionError;
 }
 
+export async function attachOrphanBrainstormingTitlesToSession(session: BrainstormingSession) {
+  const now = new Date().toISOString();
+
+  if (!hasSupabaseAdminConfig()) {
+    const store = await readBrainstormingStore();
+    let changed = false;
+    store.titles = store.titles.map((title) => {
+      const createdDate = title.created_at ? toIndiaDateKey(new Date(title.created_at)) : null;
+      if (title.session_id || title.status !== "Proposed" || createdDate !== session.session_date) return title;
+      changed = true;
+      return { ...title, session_id: session.id, updated_at: now };
+    });
+    if (changed) await writeBrainstormingStore(store);
+    return;
+  }
+
+  const { start, end } = indiaDateUtcRange(session.session_date);
+  const supabase = createSupabaseAdminClient();
+  const { error } = await supabase
+    .from("brainstorming_titles")
+    .update({ session_id: session.id, updated_at: now })
+    .is("session_id", null)
+    .eq("status", "Proposed")
+    .gte("created_at", start)
+    .lt("created_at", end);
+  if (error && !isMissingBrainstormingTable(error)) throw error;
+}
+
 export async function ensureDailyBrainstormingSession(date = new Date()) {
   const today = getSessionDateParts(date);
   if (today.weekday === "Sunday") {
@@ -783,6 +811,13 @@ function sortTitlesOldestFirst(a: BrainstormingTitle, b: BrainstormingTitle) {
 
 function stableImportTimestamp(index: number, baseTime: number) {
   return new Date(baseTime + index).toISOString();
+}
+
+function indiaDateUtcRange(dateKey: string) {
+  const startDate = new Date(`${dateKey}T00:00:00+05:30`);
+  const endDate = new Date(startDate);
+  endDate.setUTCDate(endDate.getUTCDate() + 1);
+  return { start: startDate.toISOString(), end: endDate.toISOString() };
 }
 
 function clean(value: string | null | undefined) {

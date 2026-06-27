@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { LiveMeetingClient } from "@/components/brainstorming/LiveMeetingClient";
-import { getBrainstormingSession, getBrainstormingTitles } from "@/lib/brainstorming";
+import { attachOrphanBrainstormingTitlesToSession, getBrainstormingSession, getBrainstormingTitles } from "@/lib/brainstorming";
 import { getCurrentUserContext, isAdmin } from "@/lib/serverAuth";
 
 export const dynamic = "force-dynamic";
@@ -12,12 +12,13 @@ type PageProps = {
 
 export default async function LiveBrainstormingPage({ params }: PageProps) {
   const { sessionId } = await params;
-  const [session, titles, context] = await Promise.all([
-    getBrainstormingSession(sessionId),
+  const session = await getBrainstormingSession(sessionId);
+  if (!session) notFound();
+  await attachOrphanBrainstormingTitlesToSession(session);
+  const [titles, context] = await Promise.all([
     getBrainstormingTitles({ sessionId, includeResurfaced: true }),
     getCurrentUserContext()
   ]);
-  if (!session) notFound();
 
   return (
     <div className="space-y-5">
@@ -29,7 +30,7 @@ export default async function LiveBrainstormingPage({ params }: PageProps) {
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href="/brainstorming/submit" className="rounded-md border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-moss hover:border-moss">Submit Title</Link>
-          <Link href="/brainstorming/import" className="rounded-md border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-moss hover:border-moss">Import Paste</Link>
+          <Link href={`/brainstorming/import?sessionId=${encodeURIComponent(sessionId)}`} className="rounded-md border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-moss hover:border-moss">Import Paste</Link>
         </div>
       </div>
       <LiveMeetingClient
