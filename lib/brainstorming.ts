@@ -193,7 +193,7 @@ export async function attachOrphanBrainstormingTitlesToSession(session: Brainsto
     let changed = false;
     store.titles = store.titles.map((title) => {
       const createdDate = title.created_at ? toIndiaDateKey(new Date(title.created_at)) : null;
-      if (title.session_id || title.status !== "Proposed" || createdDate !== session.session_date) return title;
+      if (title.session_id === session.id || title.status !== "Proposed" || createdDate !== session.session_date) return title;
       changed = true;
       return { ...title, session_id: session.id, updated_at: now };
     });
@@ -206,10 +206,10 @@ export async function attachOrphanBrainstormingTitlesToSession(session: Brainsto
   const { error } = await supabase
     .from("brainstorming_titles")
     .update({ session_id: session.id, updated_at: now })
-    .is("session_id", null)
     .eq("status", "Proposed")
     .gte("created_at", start)
-    .lt("created_at", end);
+    .lt("created_at", end)
+    .or(`session_id.is.null,session_id.neq.${session.id}`);
   if (error && !isMissingBrainstormingTable(error)) throw error;
 }
 
