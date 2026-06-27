@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { ClipboardList, Plus } from "lucide-react";
 import { FRESH_START_CHANNELS, PRIORITIES } from "@/lib/sharedConstants";
 import type { BrainstormingSession } from "@/lib/types";
@@ -23,7 +22,6 @@ export function WhatsAppImportClient({
   sessions: BrainstormingSession[];
   initialSessionId?: string;
 }) {
-  const router = useRouter();
   const [text, setText] = useState("");
   const [sessionId, setSessionId] = useState(initialSessionId ?? sessions[0]?.id ?? "");
   const [preview, setPreview] = useState<Row[]>([]);
@@ -61,13 +59,17 @@ export function WhatsAppImportClient({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ titles: preview.map((row) => ({ ...row, sessionId })) })
     });
-    const payload = await response.json();
+    const payload = await response.json().catch(() => ({}));
     setSaving(false);
     if (!response.ok) {
       setMessage(payload.error || "Could not save imported titles.");
       return;
     }
-    router.push(sessionId ? `/brainstorming/live/${sessionId}` : "/brainstorming/title-bank");
+    if (!payload.createdCount) {
+      setMessage("Import finished but no titles were created. Please preview again and retry.");
+      return;
+    }
+    window.location.assign(`/brainstorming/live/${sessionId}?imported=${Date.now()}`);
   }
 
   function updateRow(index: number, patch: Partial<Row>) {

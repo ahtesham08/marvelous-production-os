@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createBrainstormingTitles, previewWhatsAppImport } from "@/lib/brainstorming";
+import { attachBrainstormingTitlesToSession, createBrainstormingTitles, previewWhatsAppImport } from "@/lib/brainstorming";
 import { getCurrentUserContext } from "@/lib/serverAuth";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +25,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Choose a brainstorming session before importing titles." }, { status: 400 });
     }
     const created = await createBrainstormingTitles(titles, context.user);
-    return NextResponse.json({ created });
+    const sessionId = titles[0]?.sessionId;
+    const createdIds = created.map((title) => title.id);
+    const attached =
+      sessionId && createdIds.length > 0
+        ? await attachBrainstormingTitlesToSession(sessionId, createdIds)
+        : created;
+    return NextResponse.json({ created: attached, createdCount: attached.length, sessionId });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "WhatsApp import failed." }, { status: 400 });
   }
