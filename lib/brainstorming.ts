@@ -335,21 +335,45 @@ export async function getBrainstormingTitles(options: { sessionId?: string; stat
   }
 
   const supabase = createSupabaseAdminClient();
+  const selectFields = "*, brainstorming_discussion_notes(*)";
+
+  if (options.sessionId) {
+    let sessionQuery = supabase
+      .from("brainstorming_titles")
+      .select(selectFields)
+      .eq("session_id", options.sessionId)
+      .order("created_at", { ascending: true });
+    if (options.status) sessionQuery = sessionQuery.eq("status", options.status);
+
+    const { data: sessionData, error: sessionError } = await sessionQuery;
+    if (sessionError && isMissingBrainstormingTable(sessionError)) return [];
+    if (sessionError) throw sessionError;
+
+    let rows = (sessionData ?? []) as BrainstormingTitle[];
+    if (options.includeResurfaced && (!options.status || options.status === "Hold")) {
+      const { data: holdData, error: holdError } = await supabase
+        .from("brainstorming_titles")
+        .select(selectFields)
+        .eq("status", "Hold")
+        .lte("hold_until_date", today)
+        .order("created_at", { ascending: true });
+      if (holdError && isMissingBrainstormingTable(holdError)) return rows;
+      if (holdError) throw holdError;
+      rows = dedupeBrainstormingTitles([...rows, ...((holdData ?? []) as BrainstormingTitle[])]);
+    }
+
+    return rows;
+  }
+
   let query = supabase
     .from("brainstorming_titles")
-    .select("*, brainstorming_discussion_notes(*)")
-    .order("created_at", { ascending: Boolean(options.sessionId) });
-  if (options.sessionId && !options.includeResurfaced) query = query.eq("session_id", options.sessionId);
+    .select(selectFields)
+    .order("created_at", { ascending: false });
   if (options.status) query = query.eq("status", options.status);
   const { data, error } = await query;
   if (error && isMissingBrainstormingTable(error)) return [];
   if (error) throw error;
-  return ((data ?? []) as BrainstormingTitle[])
-    .filter((title) => {
-      if (!options.sessionId) return true;
-      if (title.session_id === options.sessionId) return true;
-      return Boolean(options.includeResurfaced && title.status === "Hold" && title.hold_until_date && title.hold_until_date <= today);
-    });
+  return (data ?? []) as BrainstormingTitle[];
 }
 
 export async function getBrainstormingTitle(titleId: string) {
@@ -425,6 +449,11 @@ export function parseWhatsAppTitles(text: string): WhatsAppImportRow[] {
   for (const rawLine of text.split(/\r?\n/)) {
     const line = rawLine.trim();
     if (!line) continue;
+    const knownSupervisor = normalizeKnownSupervisor(line);
+    if (knownSupervisor) {
+      supervisor = knownSupervisor;
+      continue;
+    }
     const heading = line.match(/^([A-Za-z][A-Za-z\s.'-]{1,40}):$/);
     if (heading) {
       supervisor = heading[1].trim();
@@ -432,6 +461,7 @@ export function parseWhatsAppTitles(text: string): WhatsAppImportRow[] {
     }
 
     const title = line
+      .replace(/^\s*\d+\s*;\s*/, "")
       .replace(/^\s*(?:\d+[\).:-]|[-*•])\s*/, "")
       .replace(/\s+/g, " ")
       .trim();
@@ -791,6 +821,13 @@ function normalizePriority(value: string | null | undefined) {
   return normalizePriorityLabel(cleaned);
 }
 
+function normalizeKnownSupervisor(value: string) {
+  const cleaned = value.replace(/:$/, "").trim().toLowerCase();
+  const supervisors = ["ahtesham", "kamran", "farhan", "raktim", "deepak"];
+  const match = supervisors.find((name) => name === cleaned);
+  return match ? match.charAt(0).toUpperCase() + match.slice(1) : null;
+}
+
 function normalizeDate(value: string | null | undefined) {
   const cleaned = clean(value);
   if (!cleaned) return null;
@@ -830,6 +867,15 @@ function attachNotes(titles: BrainstormingTitle[], notes: BrainstormingDiscussio
     ...title,
     brainstorming_discussion_notes: notes.filter((note) => note.brainstorming_title_id === title.id)
   }));
+}
+
+function dedupeBrainstormingTitles(titles: BrainstormingTitle[]) {
+  const seen = new Set<string>();
+  return titles.filter((title) => {
+    if (seen.has(title.id)) return false;
+    seen.add(title.id);
+    return true;
+  });
 }
 
 function sortSessions(a: BrainstormingSession, b: BrainstormingSession) {
