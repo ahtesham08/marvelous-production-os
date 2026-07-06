@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { FiltersBar } from "@/components/FiltersBar";
@@ -11,7 +11,7 @@ import { PriorityBadge } from "@/components/PriorityBadge";
 import { getTitleFreshnessLabel } from "@/lib/adminAttention";
 import { priorityRank } from "@/lib/sharedConstants";
 import { STATUS_VALUES, toIndiaDateKey } from "@/lib/statusRules";
-import { matchesTitleSearch, titleSearchScore } from "@/lib/titleSearch";
+import { titleSearchScore } from "@/lib/titleSearch";
 import type { EnrichedTitle } from "@/lib/types";
 
 type TitleTableProps = {
@@ -31,6 +31,11 @@ type InlineValues = Record<InlineField, string>;
 type InlineCell = {
   id: string;
   field: Exclude<InlineField, "status">;
+};
+
+type ScoredTitle = {
+  title: EnrichedTitle;
+  searchScore: number;
 };
 
 export function TitleTable({
@@ -64,6 +69,7 @@ export function TitleTable({
   const [draftValue, setDraftValue] = useState("");
   const [savingCell, setSavingCell] = useState<string | null>(null);
   const [inlineValues, setInlineValues] = useState<Record<string, Partial<InlineValues>>>({});
+  const deferredSearch = useDeferredValue(search);
 
   const supervisors = useMemo(
     () =>
@@ -75,7 +81,7 @@ export function TitleTable({
   const channels = useMemo(() => Array.from(new Set(titles.map((title) => title.channel).filter(Boolean))).sort(), [titles]);
 
   const filteredTitles = useMemo(() => {
-    const query = search.trim();
+    const query = deferredSearch.trim();
     const range = getDateRange(dateFilter, customStart, customEnd);
     const statusTokens = parseStatusTokens(status);
     return titles
@@ -89,15 +95,20 @@ export function TitleTable({
         const value = title.approvedDate || title.createdDate;
         return Boolean(value && value >= range.start && value <= range.end);
       })
-      .filter((title) => {
+      .map((title) => ({
+        title,
+        searchScore: query ? titleSearchScore(title, query) : 1
+      }))
+      .filter((entry) => {
         if (!query) return true;
-        return matchesTitleSearch(title, query);
+        return entry.searchScore > 0;
       })
-      .sort((a, b) => compareTitles(a, b, sortBy, query));
-  }, [channel, customEnd, customStart, dateFilter, priority, rottingOnly, search, sortBy, status, supervisor, titles]);
+      .sort((a, b) => compareScoredTitles(a, b, sortBy, Boolean(query)))
+      .map((entry) => entry.title);
+  }, [channel, customEnd, customStart, dateFilter, deferredSearch, priority, rottingOnly, sortBy, status, supervisor, titles]);
 
-  useEffect(() => {
-    const next = new URLSearchParams(searchParams.toString());
+  const filterParams = useMemo(() => {
+    const next = new URLSearchParams();
     updateParam(next, "q", search, "");
     updateParam(next, "supervisor", supervisor, initialSupervisor);
     updateParam(next, "channel", channel, initialChannel);
@@ -107,14 +118,19 @@ export function TitleTable({
     updateParam(next, "start", customStart, "");
     updateParam(next, "end", customEnd, "");
     updateParam(next, "sort", sortBy, "age");
-    const query = next.toString();
-    const nextUrl = query ? `${pathname}?${query}` : pathname;
-    const currentUrl = searchParams.toString() ? `${pathname}?${searchParams}` : pathname;
-    if (nextUrl !== currentUrl) router.replace(nextUrl, { scroll: false });
-  }, [channel, customEnd, customStart, dateFilter, initialChannel, initialSupervisor, pathname, priority, router, search, searchParams, sortBy, status, supervisor]);
+    return next;
+  }, [channel, customEnd, customStart, dateFilter, initialChannel, initialSupervisor, priority, search, sortBy, status, supervisor]);
 
-  const returnPath = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
-  const visibleIds = filteredTitles.map((title) => title.id);
+  useEffect(() => {
+    const query = filterParams.toString();
+    const nextUrl = query ? `${pathname}?${query}` : pathname;
+    const currentUrl = `${window.location.pathname}${window.location.search}`;
+    if (nextUrl !== currentUrl) window.history.replaceState(null, "", nextUrl);
+  }, [filterParams, pathname]);
+
+  const filterQuery = filterParams.toString();
+  const returnPath = `${pathname}${filterQuery ? `?${filterQuery}` : ""}`;
+  const visibleIds = useMemo(() => filteredTitles.map((title) => title.id), [filteredTitles]);
   const selectedVisibleIds = selectedIds.filter((id) => visibleIds.includes(id));
   const allVisibleSelected = visibleIds.length > 0 && selectedVisibleIds.length === visibleIds.length;
 
@@ -189,7 +205,7 @@ export function TitleTable({
     for (const key of ["q", "supervisor", "channel", "status", "priority", "date", "start", "end", "sort"]) {
       window.localStorage.removeItem(`marvelous-title-table-${key}`);
     }
-    router.replace(pathname, { scroll: false });
+    window.history.replaceState(null, "", pathname);
   }
 
   function startInlineEdit(title: EnrichedTitle, field: Exclude<InlineField, "status">) {
@@ -732,11 +748,15 @@ function parseDateKey(value: string) {
   return new Date(`${value}T00:00:00`);
 }
 
-function compareTitles(a: EnrichedTitle, b: EnrichedTitle, sortBy: string, searchQuery = "") {
-  if (searchQuery.trim()) {
-    const bySearch = titleSearchScore(b, searchQuery) - titleSearchScore(a, searchQuery);
+function compareScoredTitles(a: ScoredTitle, b: ScoredTitle, sortBy: string, hasSearchQuery: boolean) {
+  if (hasSearchQuery) {
+    const bySearch = b.searchScore - a.searchScore;
     if (bySearch !== 0) return bySearch;
   }
+  return compareTitles(a.title, b.title, sortBy);
+}
+
+function compareTitles(a: EnrichedTitle, b: EnrichedTitle, sortBy: string) {
   if (sortBy === "priority") {
     const byPriority = priorityRank(a.priority) - priorityRank(b.priority);
     if (byPriority !== 0) return byPriority;
