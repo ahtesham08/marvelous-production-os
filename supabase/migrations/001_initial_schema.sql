@@ -129,7 +129,9 @@ values
   ('LL', 'LL'),
   ('Gamers', 'Gamers'),
   ('Anime', 'Anime'),
-  ('Long Reads', 'Long Reads')
+  ('Long Reads', 'Long Reads'),
+  ('OCTAGON OF HORROR', 'OCTAGON OF HORROR'),
+  ('MARVELOUS ANIME', 'MARVELOUS ANIME')
 on conflict (name) do update set
   sheet_tab_name = excluded.sheet_tab_name,
   active = true,

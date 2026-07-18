@@ -9,7 +9,7 @@ import { MissingFieldsBadge } from "@/components/MissingFieldsBadge";
 import { StatusBadge } from "@/components/StatusBadge";
 import { PriorityBadge } from "@/components/PriorityBadge";
 import { getTitleFreshnessLabel } from "@/lib/adminAttention";
-import { priorityRank } from "@/lib/sharedConstants";
+import { FRESH_START_CHANNELS, priorityRank } from "@/lib/sharedConstants";
 import { STATUS_VALUES, toIndiaDateKey } from "@/lib/statusRules";
 import { titleSearchScore } from "@/lib/titleSearch";
 import type { EnrichedTitle } from "@/lib/types";
@@ -78,7 +78,10 @@ export function TitleTable({
       ).sort(),
     [titles]
   );
-  const channels = useMemo(() => Array.from(new Set(titles.map((title) => title.channel).filter(Boolean))).sort(), [titles]);
+  const channels = useMemo(
+    () => Array.from(new Set([...FRESH_START_CHANNELS, ...titles.map((title) => title.channel).filter(Boolean)])).sort(),
+    [titles]
+  );
 
   const filteredTitles = useMemo(() => {
     const query = deferredSearch.trim();

@@ -3,9 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
-
-const channels = ["MV N", "LL", "Gamers", "Anime", "Long Reads"];
-const priorities = ["Ultra Urgent", "Urgent", "Normal", "Low"];
+import { FRESH_START_CHANNELS, PRIORITIES } from "@/lib/sharedConstants";
 
 export default function NewTitlePage() {
   const router = useRouter();
@@ -63,7 +61,7 @@ export default function NewTitlePage() {
           </Field>
           <Field label="Channel">
             <select className="field-input" value={form.channel} onChange={(event) => update("channel", event.target.value)}>
-              {channels.map((channel) => (
+              {FRESH_START_CHANNELS.map((channel) => (
                 <option key={channel} value={channel}>
                   {channel}
                 </option>
@@ -72,7 +70,7 @@ export default function NewTitlePage() {
           </Field>
           <Field label="Priority">
             <select className="field-input" value={form.priority} onChange={(event) => update("priority", event.target.value)}>
-              {priorities.map((priority) => (
+              {PRIORITIES.map((priority) => (
                 <option key={priority} value={priority}>
                   {priority}
                 </option>

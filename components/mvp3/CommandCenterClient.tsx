@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { SectionList } from "@/components/mvp3/SectionList";
 import { isCompletedThisWeek, isCompletedToday, isOverdue, operationsSections } from "@/lib/mvp3Views";
+import { FRESH_START_CHANNELS } from "@/lib/sharedConstants";
 import type { BrainstormingSummary, EnrichedTitle, SupervisorSummary } from "@/lib/types";
 
 export function CommandCenterClient({
@@ -33,7 +34,7 @@ export function CommandCenterClient({
     [ageBucket, channel, priority, status, supervisor, titles]
   );
   const ops = operationsSections(filtered);
-  const channels = Array.from(new Set(titles.map((title) => title.channel))).sort();
+  const channels = Array.from(new Set([...FRESH_START_CHANNELS, ...titles.map((title) => title.channel).filter(Boolean)])).sort();
   const supervisors = Array.from(new Set(titles.map((title) => title.supervisor))).sort();
   const priorities = Array.from(new Set(titles.map((title) => title.priority))).sort();
   const statuses = Array.from(new Set(titles.map((title) => title.status))).sort();

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { USER_ROLES } from "@/lib/roles";
+import { FRESH_START_CHANNELS } from "@/lib/sharedConstants";
 import type { UserRecord } from "@/lib/types";
 
 export function UserManager({ initialUsers }: { initialUsers: UserRecord[] }) {
@@ -46,7 +47,14 @@ export function UserManager({ initialUsers }: { initialUsers: UserRecord[] }) {
               <option key={role} value={role}>{role}</option>
             ))}
           </select>
-          <input className="field-input" placeholder="Default channel optional" value={form.default_channel} onChange={(event) => setForm({ ...form, default_channel: event.target.value })} />
+          <select className="field-input" value={form.default_channel} onChange={(event) => setForm({ ...form, default_channel: event.target.value })}>
+            <option value="">Default channel optional</option>
+            {FRESH_START_CHANNELS.map((channel) => (
+              <option key={channel} value={channel}>
+                {channel}
+              </option>
+            ))}
+          </select>
           <input className="field-input" placeholder="Default supervisor optional" value={form.default_supervisor} onChange={(event) => setForm({ ...form, default_supervisor: event.target.value })} />
           <label className="flex items-center gap-2 rounded-md border border-black/10 px-3 py-2 text-sm font-medium">
             <input type="checkbox" checked={form.active} onChange={(event) => setForm({ ...form, active: event.target.checked })} />

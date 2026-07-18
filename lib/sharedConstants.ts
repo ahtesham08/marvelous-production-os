@@ -1,6 +1,14 @@
 import type { BrainstormingSession, BrainstormingTitle } from "@/lib/types";
 
-export const FRESH_START_CHANNELS = ["MV N", "LL", "Gamers", "Anime", "Long Reads"] as const;
+export const FRESH_START_CHANNELS = [
+  "MV N",
+  "LL",
+  "Gamers",
+  "Anime",
+  "Long Reads",
+  "OCTAGON OF HORROR",
+  "MARVELOUS ANIME"
+] as const;
 export const PRIORITIES = ["Low", "Normal", "Urgent", "Ultra Urgent"] as const;
 
 export function normalizePriorityLabel(value: string | null | undefined) {

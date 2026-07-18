@@ -401,11 +401,25 @@ The job is safe to run more than once. If a non-archived session already exists 
 Default auto-created sessions use:
 
 - Name: `Brainstorming YYYY-MM-DD`
-- Channels: `MV N`, `LL`, `Gamers`, `Anime`, `Long Reads`
+- Channels: `MV N`, `LL`, `Gamers`, `Anime`, `Long Reads`, `OCTAGON OF HORROR`, `MARVELOUS ANIME`
 - Participants: `Ahtesham`, `Kamran`, `Farhan`, `Raktim`
 - Status: `Draft`
 
 Admins can rename a session from Live Review Mode using the `Save Name` control at the top of the session.
+
+## Active Production Channels
+
+Marvelous Production OS supports these active channels for fresh production titles:
+
+- `MV N`
+- `LL`
+- `Gamers`
+- `Anime`
+- `Long Reads`
+- `OCTAGON OF HORROR`
+- `MARVELOUS ANIME`
+
+The old Google Sheets remain archive/reference only. Their tab names are not changed by this app.
 
 ## Live Review And Production Workflow Updates
 
