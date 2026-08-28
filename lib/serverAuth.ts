@@ -56,15 +56,21 @@ export async function getCurrentUserContext(): Promise<AppUserContext> {
           return cookieStore.getAll();
         },
         setAll(cookiesToSet: CookieToSet[]) {
-          cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
+          try {
+            cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
+          } catch {
+            // Server Components cannot always persist refreshed auth cookies. Middleware/route handlers handle cookie writes.
+          }
         }
       }
     }
   );
 
-  const {
-    data: { user: authUser }
-  } = await supabase.auth.getUser();
+  const authResult = await supabase.auth.getUser().catch((error) => ({
+    data: { user: null },
+    error
+  }));
+  const authUser = authResult.data.user;
 
   if (!authUser?.email) {
     return {

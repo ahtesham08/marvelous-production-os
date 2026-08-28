@@ -67,7 +67,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
 
   const role = userContext.user?.role ?? (mode === "demo" ? "Admin" : "Viewer");
   const userName = userContext.user?.name ?? (userContext.authEmail || "Demo User");
-  const unreadCount = await getUnreadNotificationCount(userContext.user);
+  const unreadCount = await getUnreadNotificationCount(userContext.user).catch(() => 0);
 
   return (
     <html lang="en" suppressHydrationWarning>
