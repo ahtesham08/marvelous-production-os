@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import Script from "next/script";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { getAppMode } from "@/lib/appMode";
@@ -40,10 +42,29 @@ const navItems = [
 ];
 
 const adminPrefixes = ["/admin"];
+const publicPaths = ["/login", "/auth/callback", "/not-approved"];
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const requestHeaders = await headers();
+  const pathname = requestHeaders.get("x-mpos-pathname") ?? "";
+  const isPublicPath = publicPaths.some((path) => pathname.startsWith(path));
   const userContext = await getCurrentUserContext();
   const mode = getAppMode();
+
+  if (mode === "production" && !isPublicPath) {
+    if (!userContext.isAuthenticated) {
+      redirect(`/login?next=${encodeURIComponent(pathname || "/")}`);
+    }
+
+    if (!userContext.isApproved) {
+      redirect("/not-approved");
+    }
+  }
+
+  if (userContext.isAuthenticated && pathname === "/login") {
+    redirect("/");
+  }
+
   const role = userContext.user?.role ?? (mode === "demo" ? "Admin" : "Viewer");
   const userName = userContext.user?.name ?? (userContext.authEmail || "Demo User");
   const unreadCount = await getUnreadNotificationCount(userContext.user);

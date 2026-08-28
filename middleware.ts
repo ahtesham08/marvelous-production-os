@@ -1,103 +1,54 @@
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 const publicPaths = ["/login", "/auth/callback", "/not-approved"];
 
-type CookieToSet = {
-  name: string;
-  value: string;
-  options: CookieOptions;
-};
-
-export async function middleware(request: NextRequest) {
-  const appMode = process.env.NEXT_PUBLIC_APP_MODE;
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isPublicPath = publicPaths.some((path) => pathname.startsWith(path));
   const isCronPath = pathname.startsWith("/api/cron/");
+  const isApiPath = pathname.startsWith("/api/");
+  const appMode = process.env.NEXT_PUBLIC_APP_MODE;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (isCronPath) {
-    return NextResponse.next();
-  }
+  if (isCronPath) return NextResponse.next();
 
-  if (appMode !== "production" && !supabaseUrl) {
-    return NextResponse.next();
-  }
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    if (appMode === "production" && !isPublicPath) {
-      const redirectUrl = request.nextUrl.clone();
-      redirectUrl.pathname = "/login";
-      redirectUrl.searchParams.set("error", "production-env-missing");
-      return NextResponse.redirect(redirectUrl);
+  if (appMode === "production" && (!supabaseUrl || !supabaseAnonKey) && !isPublicPath) {
+    if (isApiPath) {
+      return NextResponse.json({ error: "Production Supabase environment variables are missing." }, { status: 503 });
     }
-    return NextResponse.next();
+
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = "/login";
+    redirectUrl.searchParams.set("error", "production-env-missing");
+    return NextResponse.redirect(redirectUrl);
   }
 
-  let response = NextResponse.next({
-    request
-  });
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-mpos-pathname", pathname);
 
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll();
-      },
-      setAll(cookiesToSet: CookieToSet[]) {
-        cookiesToSet.forEach(({ name, value, options }) => {
-          request.cookies.set(name, value);
-          response.cookies.set(name, value, options);
-        });
-      }
+  if (appMode === "production" && !isPublicPath && !hasSupabaseSessionCookie(request)) {
+    if (isApiPath) {
+      return NextResponse.json({ error: "Authentication required." }, { status: 401 });
     }
-  });
 
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-
-  if (!user && !isPublicPath) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
     redirectUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (user && pathname === "/login") {
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = "/";
-    redirectUrl.search = "";
-    return NextResponse.redirect(redirectUrl);
-  }
-
-  if (appMode === "production" && user?.email && !isPublicPath) {
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!serviceRoleKey) {
-      const redirectUrl = request.nextUrl.clone();
-      redirectUrl.pathname = "/not-approved";
-      redirectUrl.search = "";
-      return NextResponse.redirect(redirectUrl);
+  return NextResponse.next({
+    request: {
+      headers: requestHeaders
     }
+  });
+}
 
-    const approved = await fetch(`${supabaseUrl}/rest/v1/users?email=eq.${encodeURIComponent(user.email)}&active=eq.true&select=id`, {
-      headers: {
-        apikey: serviceRoleKey,
-        authorization: `Bearer ${serviceRoleKey}`
-      }
-    })
-      .then((res) => (res.ok ? res.json() : []))
-      .catch(() => []);
-
-    if (!Array.isArray(approved) || approved.length === 0) {
-      const redirectUrl = request.nextUrl.clone();
-      redirectUrl.pathname = "/not-approved";
-      redirectUrl.search = "";
-      return NextResponse.redirect(redirectUrl);
-    }
-  }
-
-  return response;
+function hasSupabaseSessionCookie(request: NextRequest) {
+  return request.cookies
+    .getAll()
+    .some((cookie) => cookie.name.startsWith("sb-") && cookie.name.includes("auth-token") && Boolean(cookie.value));
 }
 
 export const config = {
