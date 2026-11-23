@@ -5,22 +5,19 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
 import { BrainstormingStatusBadge } from "@/components/brainstorming/BrainstormingStatusBadge";
-import type { BrainstormingSession, BrainstormingTitle } from "@/lib/types";
+import type { BrainstormingSession } from "@/lib/types";
 
 type BrainstormingSessionsClientProps = {
   sessions: BrainstormingSession[];
-  titles: BrainstormingTitle[];
+  /** Number of brainstorming titles per session id (sent instead of every title row). */
+  titleCounts: Record<string, number>;
   canDelete: boolean;
 };
 
-export function BrainstormingSessionsClient({ sessions, titles, canDelete }: BrainstormingSessionsClientProps) {
+export function BrainstormingSessionsClient({ sessions, titleCounts, canDelete }: BrainstormingSessionsClientProps) {
   const router = useRouter();
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const counts = new Map<string, number>();
-  for (const title of titles) {
-    if (!title.session_id) continue;
-    counts.set(title.session_id, (counts.get(title.session_id) ?? 0) + 1);
-  }
+  const counts = new Map<string, number>(Object.entries(titleCounts));
 
   async function deleteSession(session: BrainstormingSession) {
     const count = counts.get(session.id) ?? 0;

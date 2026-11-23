@@ -1,9 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { requireApiUser } from "@/lib/apiAuth";
 import { getTitleRecord, writeTitleBackToSheets } from "@/lib/titleUpdates";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(_request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const auth = await requireApiUser(["Admin"]);
+  if (!auth.ok) return auth.response;
   if (process.env.GOOGLE_SHEETS_WRITEBACK_MODE !== "enabled") {
     return NextResponse.json(
       { error: "Google Sheets write-back is disabled. Old sheets are archive/reference only." },

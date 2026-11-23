@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireApiUser } from "@/lib/apiAuth";
 import { hasGoogleSheetsConfig } from "@/lib/googleSheets";
 import { hasSupabaseAdminConfig } from "@/lib/supabaseServer";
 import { syncGoogleSheets } from "@/lib/sync/syncSheets";
@@ -6,6 +7,8 @@ import { syncGoogleSheets } from "@/lib/sync/syncSheets";
 export const dynamic = "force-dynamic";
 
 export async function POST() {
+  const auth = await requireApiUser(["Admin"]);
+  if (!auth.ok) return auth.response;
   if (!hasSupabaseAdminConfig()) {
     return NextResponse.json({ error: "Supabase environment variables are missing." }, { status: 400 });
   }

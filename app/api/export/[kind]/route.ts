@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { requireApiUser } from "@/lib/apiAuth";
 import { exportCsv } from "@/lib/csvExport";
 import { getDashboardData } from "@/lib/dashboardData";
 import { getUsers } from "@/lib/users";
@@ -6,6 +7,8 @@ import { getUsers } from "@/lib/users";
 export const dynamic = "force-dynamic";
 
 export async function GET(_request: NextRequest, context: { params: Promise<{ kind: string }> }) {
+  const auth = await requireApiUser();
+  if (!auth.ok) return auth.response;
   const { kind } = await context.params;
   const data = await getDashboardData({ includeActivityLog: kind === "activity" });
   const users = await getUsers();

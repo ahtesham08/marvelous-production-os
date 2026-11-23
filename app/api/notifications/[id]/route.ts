@@ -1,10 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { requireApiUser } from "@/lib/apiAuth";
 import { markNotificationRead } from "@/lib/notifications";
 import { getCurrentUserContext } from "@/lib/serverAuth";
 
 export const dynamic = "force-dynamic";
 
 export async function PATCH(_request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const auth = await requireApiUser();
+  if (!auth.ok) return auth.response;
   const { id } = await context.params;
   const userContext = await getCurrentUserContext();
 

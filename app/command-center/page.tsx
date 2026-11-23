@@ -1,3 +1,4 @@
+import { toClientTitle } from "@/lib/tableTitle";
 import { CommandCenterClient } from "@/components/mvp3/CommandCenterClient";
 import { getBrainstormingSummary } from "@/lib/brainstorming";
 import { getDashboardData } from "@/lib/dashboardData";
@@ -12,7 +13,7 @@ export default async function CommandCenterPage() {
         <p className="text-sm font-semibold uppercase text-moss">Ahtesham Morning Screen</p>
         <h1 className="mt-1 text-3xl font-semibold text-ink">Daily Command Center</h1>
       </div>
-      <CommandCenterClient titles={data.titles} supervisorSummary={data.supervisorSummary} brainstormingSummary={brainstormingSummary} />
+      <CommandCenterClient titles={data.titles.map(toClientTitle)} supervisorSummary={data.supervisorSummary} brainstormingSummary={brainstormingSummary} />
     </div>
   );
 }

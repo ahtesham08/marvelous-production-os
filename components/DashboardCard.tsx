@@ -16,8 +16,8 @@ const toneClass = {
 export function DashboardCard({ label, value, tone = "neutral" }: DashboardCardProps) {
   return (
     <section className={clsx("rounded-lg border p-4 shadow-sm", toneClass[tone])}>
-      <div className="text-3xl font-semibold text-ink">{value}</div>
-      <div className="mt-2 text-sm font-medium text-black/65">{label}</div>
+      <div className="text-2xl font-semibold text-ink">{value.toLocaleString("en-IN")}</div>
+      <div className="mt-1 text-sm font-medium leading-5 text-black/65">{label}</div>
     </section>
   );
 }

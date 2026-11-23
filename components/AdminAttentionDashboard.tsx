@@ -64,7 +64,7 @@ export function AdminAttentionDashboard({ attention }: Props) {
             className={clsx(
               "focus-ring rounded-lg border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft",
               severityClass[card.severity],
-              card.severity === "critical" && card.count > 0 && "animate-pulse",
+              card.severity === "critical" && card.count > 0 && "ring-1 ring-red-400",
               activeKey === card.key && "ring-2 ring-ink/20"
             )}
           >

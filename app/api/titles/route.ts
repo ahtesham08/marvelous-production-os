@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { requireApiUser } from "@/lib/apiAuth";
 import { createFreshTitle, type FreshTitleInput } from "@/lib/freshTitles";
 import { getCurrentUserContext } from "@/lib/serverAuth";
 import { deleteTitles } from "@/lib/titleUpdates";
@@ -6,6 +7,8 @@ import { deleteTitles } from "@/lib/titleUpdates";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
+  const auth = await requireApiUser(["Admin", "Supervisor", "Operations Supervisor"]);
+  if (!auth.ok) return auth.response;
   const payload = (await request.json()) as FreshTitleInput;
 
   try {
@@ -20,6 +23,8 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const auth = await requireApiUser();
+  if (!auth.ok) return auth.response;
   const userContext = await getCurrentUserContext();
   const payload = (await request.json()) as { ids?: string[] };
 

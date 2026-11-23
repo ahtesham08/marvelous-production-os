@@ -13,6 +13,10 @@ export default async function BrainstormingSessionsPage() {
   ]);
   const canCreate = userContext.user?.role === "Admin" || userContext.user?.role === "Supervisor";
   const canDelete = isAdmin(userContext.user?.role);
+  const titleCounts: Record<string, number> = {};
+  for (const title of titles) {
+    if (title.session_id) titleCounts[title.session_id] = (titleCounts[title.session_id] ?? 0) + 1;
+  }
 
   return (
     <div className="space-y-5">
@@ -26,7 +30,7 @@ export default async function BrainstormingSessionsPage() {
         ) : null}
       </div>
 
-      <BrainstormingSessionsClient sessions={sessions} titles={titles} canDelete={canDelete} />
+      <BrainstormingSessionsClient sessions={sessions} titleCounts={titleCounts} canDelete={canDelete} />
       {sessions.length === 0 ? <p className="rounded-lg border border-black/10 bg-white p-8 text-center text-sm text-black/55">No sessions yet.</p> : null}
     </div>
   );

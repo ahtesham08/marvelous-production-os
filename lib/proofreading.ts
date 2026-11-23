@@ -9,21 +9,23 @@ const bucketName = "proofreading-feedback";
 export async function getProofreadingBundle(titleId: string) {
   if (!hasSupabaseAdminConfig()) return emptyBundle(titleId);
   const supabase = createSupabaseAdminClient();
-  const [reviewResult, thread] = await Promise.all([getReview(titleId), ensureThread(titleId)]);
-  if (!thread) return { review: reviewResult, messages: [] };
+  // Read-only and parallel: messages carry title_id, so there is no need to look up
+  // (or create) the thread just to view a title. Threads are still created on first message.
+  const [reviewResult, messagesResult] = await Promise.all([
+    getReview(titleId),
+    supabase
+      .from("proofreading_messages")
+      .select("*")
+      .eq("title_id", titleId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: true })
+  ]);
 
-  const { data, error } = await supabase
-    .from("proofreading_messages")
-    .select("*")
-    .eq("thread_id", thread.id)
-    .is("deleted_at", null)
-    .order("created_at", { ascending: true });
-
-  if (isMissingProofreadingTable(error)) return emptyBundle(titleId);
-  if (error) throw error;
+  if (isMissingProofreadingTable(messagesResult.error)) return emptyBundle(titleId);
+  if (messagesResult.error) throw messagesResult.error;
   return {
     review: reviewResult,
-    messages: (data ?? []) as ProofreadingMessage[]
+    messages: (messagesResult.data ?? []) as ProofreadingMessage[]
   };
 }
 

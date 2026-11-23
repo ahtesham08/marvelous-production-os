@@ -116,6 +116,7 @@ textarea {
 }
 
 body.title-table-focus-mode > header,
+body.title-table-focus-mode header[data-focus-chrome],
 body.title-table-focus-mode aside,
 body.title-table-focus-mode [data-focus-chrome] {
   display: none !important;

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { getAppMode } from "@/lib/appMode";
@@ -19,7 +20,13 @@ export type AppUserContext = {
   message?: string;
 };
 
-export async function getCurrentUserContext(): Promise<AppUserContext> {
+/**
+ * Deduplicated per request: the root layout and the page both need the signed-in user.
+ * Without cache() each call did its own Supabase Auth round trip + users lookup.
+ */
+export const getCurrentUserContext = cache(loadCurrentUserContext);
+
+async function loadCurrentUserContext(): Promise<AppUserContext> {
   const mode = getAppMode();
 
   if (!hasSupabasePublicConfig()) {

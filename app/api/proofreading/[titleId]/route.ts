@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { requireApiUser } from "@/lib/apiAuth";
 import {
   addProofreadingMessage,
   blockScript,
@@ -11,6 +12,8 @@ import { getCurrentUserContext } from "@/lib/serverAuth";
 export const dynamic = "force-dynamic";
 
 export async function GET(_request: NextRequest, context: { params: Promise<{ titleId: string }> }) {
+  const auth = await requireApiUser();
+  if (!auth.ok) return auth.response;
   const { titleId } = await context.params;
   try {
     const bundle = await getProofreadingBundle(titleId);
@@ -21,6 +24,8 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ ti
 }
 
 export async function POST(request: NextRequest, context: { params: Promise<{ titleId: string }> }) {
+  const auth = await requireApiUser();
+  if (!auth.ok) return auth.response;
   const { titleId } = await context.params;
   const userContext = await getCurrentUserContext();
 

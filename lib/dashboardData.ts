@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { generateAlerts } from "@/lib/alertEngine";
 import { generateDailyReport } from "@/lib/reportGenerator";
 import { getLocalTitleRecords } from "@/lib/localStore";
@@ -19,7 +20,16 @@ type DashboardDataOptions = {
   includeActivityLog?: boolean;
 };
 
-export async function getDashboardData(options: DashboardDataOptions = {}): Promise<DashboardData> {
+// Supabase/PostgREST returns at most 1,000 rows per request by default.
+// The old single query silently dropped every title past row 1,000 ("Tracking 1000 active title records").
+const PAGE_SIZE = 1000;
+
+/**
+ * Deduplicated per request (React cache): pages, layouts and helpers that call
+ * getDashboardData() during the same render share one database read.
+ */
+const loadDashboardDataCached = cache(async (includeActivityLog: boolean): Promise<DashboardData> => {
+  const options = { includeActivityLog };
   if (!hasSupabaseAdminConfig()) {
     const titles = (await getLocalTitleRecords()).map(enrichTitle);
     return buildDashboard(
@@ -29,26 +39,64 @@ export async function getDashboardData(options: DashboardDataOptions = {}): Prom
   }
 
   const supabase = createSupabaseAdminClient();
-  let { data, error } = await supabase
-    .from("titles")
-    .select(titleSelect(options))
-    .order("updated_at", { ascending: false });
+  let result = await fetchAllTitleRows(supabase, titleSelect(options));
 
-  if (isMissingProofreadingRelation(error)) {
-    const fallback = await supabase
-      .from("titles")
-      .select(titleSelect(options, { includeProofreading: false }))
-      .order("updated_at", { ascending: false });
-    data = fallback.data;
-    error = fallback.error;
+  if (isMissingProofreadingRelation(result.error)) {
+    result = await fetchAllTitleRows(supabase, titleSelect(options, { includeProofreading: false }));
   }
 
-  if (error) {
-    return emptyDashboard(error.message);
+  if (result.error) {
+    return emptyDashboard(errorMessage(result.error));
   }
 
-  const titles = ((data ?? []) as unknown as TitleRecord[]).map(enrichTitle);
+  const titles = result.rows.map(enrichTitle);
   return buildDashboard(titles);
+});
+
+export async function getDashboardData(options: DashboardDataOptions = {}): Promise<DashboardData> {
+  return loadDashboardDataCached(Boolean(options.includeActivityLog));
+}
+
+type SupabaseAdmin = ReturnType<typeof createSupabaseAdminClient>;
+
+async function fetchAllTitleRows(supabase: SupabaseAdmin, select: string): Promise<{ rows: TitleRecord[]; error: unknown }> {
+  const pageQuery = (from: number, withCount: boolean) =>
+    supabase
+      .from("titles")
+      .select(select, withCount ? { count: "exact" } : undefined)
+      .order("updated_at", { ascending: false })
+      .order("id", { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+
+  const first = await pageQuery(0, true);
+  if (first.error) return { rows: [], error: first.error };
+
+  const rows = [...((first.data ?? []) as unknown as TitleRecord[])];
+  const total = first.count ?? rows.length;
+
+  if (total > rows.length) {
+    const offsets: number[] = [];
+    for (let from = PAGE_SIZE; from < total; from += PAGE_SIZE) offsets.push(from);
+    const pages = await Promise.all(offsets.map((from) => pageQuery(from, false)));
+    for (const page of pages) {
+      if (page.error) return { rows: [], error: page.error };
+      rows.push(...((page.data ?? []) as unknown as TitleRecord[]));
+    }
+  }
+
+  // Guard against a row shifting between pages while someone edits during the read.
+  const seen = new Set<string>();
+  const unique = rows.filter((row) => {
+    if (seen.has(row.id)) return false;
+    seen.add(row.id);
+    return true;
+  });
+  return { rows: unique, error: null };
+}
+
+function errorMessage(error: unknown) {
+  if (error && typeof error === "object" && "message" in error) return String(error.message);
+  return "Unable to load titles.";
 }
 
 export async function getEnrichedTitleById(titleId: string, options: DashboardDataOptions = {}) {

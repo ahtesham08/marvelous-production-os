@@ -1,10 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { requireApiUser } from "@/lib/apiAuth";
 import { deleteTitles, getTitleRecord, updateTitle, type TitleUpdatePayload } from "@/lib/titleUpdates";
 import { getCurrentUserContext } from "@/lib/serverAuth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(_request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const auth = await requireApiUser();
+  if (!auth.ok) return auth.response;
   const { id } = await context.params;
 
   try {
@@ -16,6 +19,8 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
 }
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const auth = await requireApiUser();
+  if (!auth.ok) return auth.response;
   const { id } = await context.params;
   const payload = (await request.json()) as TitleUpdatePayload;
   const userContext = await getCurrentUserContext();
@@ -39,6 +44,8 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
 }
 
 export async function DELETE(_request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const auth = await requireApiUser();
+  if (!auth.ok) return auth.response;
   const { id } = await context.params;
   const userContext = await getCurrentUserContext();
 

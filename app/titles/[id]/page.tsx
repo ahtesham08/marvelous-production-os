@@ -24,13 +24,14 @@ export default async function TitleDetailPage({
 }) {
   const { id } = await params;
   const { return: returnPath } = await searchParams;
-  const [title, userContext] = await Promise.all([
+  // Load the title, the signed-in user and the proofreading thread at the same time.
+  const [title, userContext, proofreading] = await Promise.all([
     getEnrichedTitleById(id, { includeActivityLog: true }),
-    getCurrentUserContext()
+    getCurrentUserContext(),
+    getProofreadingBundle(id)
   ]);
 
   if (!title) notFound();
-  const proofreading = await getProofreadingBundle(id);
   const canDelete =
     userContext.user?.role === "Admin" ||
     (userContext.user?.role === "Supervisor" && title.supervisor.toLowerCase() === userContext.user.name.toLowerCase());

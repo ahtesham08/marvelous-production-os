@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { SectionList } from "@/components/mvp3/SectionList";
+import { CollapsibleSectionList } from "@/components/mvp3/CollapsibleSectionList";
 import { isCompletedThisWeek, isCompletedToday, isOverdue, operationsSections } from "@/lib/mvp3Views";
 import { FRESH_START_CHANNELS } from "@/lib/sharedConstants";
+import { toIndiaDateKey } from "@/lib/statusRules";
 import type { BrainstormingSummary, EnrichedTitle, SupervisorSummary } from "@/lib/types";
 
 export function CommandCenterClient({
@@ -77,9 +78,9 @@ export function CommandCenterClient({
         </div>
       </section>
 
-      <SectionList
+      <CollapsibleSectionList
         sections={[
-          { title: "Approved Today", titles: filtered.filter((title) => title.approvedDate === new Date().toISOString().slice(0, 10)) },
+          { title: "Approved Today", titles: filtered.filter((title) => title.approvedDate === toIndiaDateKey(new Date())) },
           { title: "Approved This Week", titles: filtered.filter((title) => title.ageDays <= 7) },
           { title: "Critical Delayed Titles", titles: filtered.filter((title) => title.severity === "Critical") },
           { title: "Deepak Pending Operations", titles: [...ops.wordCountMissing, ...ops.voMissing, ...ops.editorMissing, ...ops.proofreaderMissing] },

@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { requireApiUser } from "@/lib/apiAuth";
 import {
   createBrainstormingSession,
   deleteBrainstormingSession,
@@ -10,6 +11,8 @@ import { getCurrentUserContext, isAdmin } from "@/lib/serverAuth";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const auth = await requireApiUser();
+  if (!auth.ok) return auth.response;
   try {
     return NextResponse.json({ sessions: await getBrainstormingSessionsWithDailyEnsure() });
   } catch (error) {

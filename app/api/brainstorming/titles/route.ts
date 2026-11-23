@@ -1,10 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { requireApiUser } from "@/lib/apiAuth";
 import { attachBrainstormingTitlesToSession, createBrainstormingTitle, getBrainstormingTitles } from "@/lib/brainstorming";
 import { getCurrentUserContext } from "@/lib/serverAuth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
+  const auth = await requireApiUser();
+  if (!auth.ok) return auth.response;
   const { searchParams } = new URL(request.url);
   try {
     const titles = await getBrainstormingTitles({

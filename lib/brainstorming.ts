@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
@@ -6,6 +7,7 @@ import { normalizeTitle } from "@/lib/titleNormalizer";
 import { FRESH_START_CHANNELS, normalizePriorityLabel } from "@/lib/sharedConstants";
 import { createBrainstormingApprovalNotification } from "@/lib/notifications";
 import { toIndiaDateKey } from "@/lib/statusRules";
+import { fetchAllPages } from "@/lib/supabasePaging";
 import type {
   BrainstormingDiscussionNote,
   BrainstormingSession,
@@ -57,8 +59,14 @@ type BrainstormingStore = {
 
 const storePath = path.join(process.cwd(), ".data", "brainstorming-store.json");
 
+/**
+ * Runs the "make sure today's session exists" check once per page render.
+ * Pages used to trigger it two or three times in parallel (race-prone and slow).
+ */
+const ensureTodaySessionOnce = cache(() => ensureDailyBrainstormingSession());
+
 export async function getBrainstormingSummary(): Promise<BrainstormingSummary> {
-  await ensureDailyBrainstormingSession();
+  await ensureTodaySessionOnce();
   const today = getSessionDateParts(new Date()).date;
   const [sessions, titles] = await Promise.all([getBrainstormingSessions(), getBrainstormingTitles()]);
   return {
@@ -70,7 +78,10 @@ export async function getBrainstormingSummary(): Promise<BrainstormingSummary> {
   };
 }
 
-export async function getBrainstormingSessions() {
+// Request-scoped dedupe for page renders (no effect inside API route handlers).
+export const getBrainstormingSessions = cache(loadBrainstormingSessions);
+
+async function loadBrainstormingSessions() {
   if (!hasSupabaseAdminConfig()) {
     const store = await readBrainstormingStore();
     return store.sessions.sort(sortSessions);
@@ -88,7 +99,7 @@ export async function getBrainstormingSessions() {
 }
 
 export async function getBrainstormingSessionsWithDailyEnsure() {
-  await ensureDailyBrainstormingSession();
+  await ensureTodaySessionOnce();
   return getBrainstormingSessions();
 }
 
@@ -108,7 +119,7 @@ export async function getBrainstormingSession(sessionId: string) {
 export async function createBrainstormingSession(input: BrainstormingSessionInput, user: UserRecord | null) {
   const now = new Date().toISOString();
   const sessionDate = normalizeDate(input.sessionDate) || now.slice(0, 10);
-  const existing = (await getBrainstormingSessions()).find((session) => session.session_date === sessionDate);
+  const existing = await findBrainstormingSessionByDate(sessionDate);
   if (existing) {
     throw new Error(`A brainstorming session already exists for ${sessionDate}. Open that session instead of creating another one.`);
   }
@@ -248,13 +259,30 @@ export async function attachBrainstormingTitlesToSession(sessionId: string, titl
   return (data ?? []) as BrainstormingTitle[];
 }
 
+/** Looks up one day's session directly instead of loading every session ever created. */
+async function findBrainstormingSessionByDate(sessionDate: string): Promise<BrainstormingSession | null> {
+  if (!hasSupabaseAdminConfig()) {
+    return (await loadBrainstormingSessions()).find((session) => session.session_date === sessionDate) ?? null;
+  }
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("brainstorming_sessions")
+    .select("*")
+    .eq("session_date", sessionDate)
+    .order("created_at", { ascending: false })
+    .limit(1);
+  if (error && isMissingBrainstormingTable(error)) return null;
+  if (error) throw error;
+  return ((data ?? [])[0] as BrainstormingSession | undefined) ?? null;
+}
+
 export async function ensureDailyBrainstormingSession(date = new Date()) {
   const today = getSessionDateParts(date);
   if (today.weekday === "Sunday") {
     return { created: false, skipped: true, reason: "Sunday", session: null };
   }
 
-  const existing = (await getBrainstormingSessions()).find((session) => session.session_date === today.date);
+  const existing = await findBrainstormingSessionByDate(today.date);
   if (existing) {
     return { created: false, skipped: false, reason: "Already exists", session: existing };
   }
@@ -320,7 +348,17 @@ export async function updateBrainstormingSession(sessionId: string, input: Parti
   return data as BrainstormingSession;
 }
 
-export async function getBrainstormingTitles(options: { sessionId?: string; status?: string; includeResurfaced?: boolean } = {}) {
+type BrainstormingTitleQuery = { sessionId?: string; status?: string; includeResurfaced?: boolean };
+
+// The unfiltered bank is requested by several components in one render; load it once.
+const loadAllBrainstormingTitlesCached = cache(() => loadBrainstormingTitles({}));
+
+export async function getBrainstormingTitles(options: BrainstormingTitleQuery = {}) {
+  if (!options.sessionId && !options.status && !options.includeResurfaced) return loadAllBrainstormingTitlesCached();
+  return loadBrainstormingTitles(options);
+}
+
+async function loadBrainstormingTitles(options: BrainstormingTitleQuery) {
   const today = getSessionDateParts(new Date()).date;
   if (!hasSupabaseAdminConfig()) {
     const store = await readBrainstormingStore();
@@ -365,20 +403,36 @@ export async function getBrainstormingTitles(options: { sessionId?: string; stat
     return rows;
   }
 
-  let query = supabase
-    .from("brainstorming_titles")
-    .select(selectFields)
-    .order("created_at", { ascending: false });
-  if (options.status) query = query.eq("status", options.status);
-  const { data, error } = await query;
+  const { data, error } = await fetchAllPages<BrainstormingTitle>((from, to) => {
+    let query = supabase
+      .from("brainstorming_titles")
+      .select(selectFields)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: true });
+    if (options.status) query = query.eq("status", options.status);
+    return query.range(from, to) as unknown as PromiseLike<{ data: BrainstormingTitle[] | null; error: unknown }>;
+  });
   if (error && isMissingBrainstormingTable(error)) return [];
   if (error) throw error;
-  return (data ?? []) as BrainstormingTitle[];
+  return dedupeBrainstormingTitles(data);
 }
 
 export async function getBrainstormingTitle(titleId: string) {
-  const titles = await getBrainstormingTitles();
-  return titles.find((title) => title.id === titleId) ?? null;
+  if (!hasSupabaseAdminConfig()) {
+    const titles = await getBrainstormingTitles();
+    return titles.find((title) => title.id === titleId) ?? null;
+  }
+
+  // Fetch the single row instead of loading the whole brainstorming bank.
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("brainstorming_titles")
+    .select("*, brainstorming_discussion_notes(*)")
+    .eq("id", titleId)
+    .maybeSingle();
+  if (error && isMissingBrainstormingTable(error)) return null;
+  if (error) throw error;
+  return (data as BrainstormingTitle | null) ?? null;
 }
 
 export async function createBrainstormingTitle(input: BrainstormingTitleInput, user: UserRecord | null) {

@@ -1,4 +1,4 @@
-import type { EnrichedTitle } from "@/lib/types";
+import type { TableTitle } from "@/lib/tableTitle";
 
 const STOP_WORDS = new Set([
   "a",
@@ -26,7 +26,7 @@ type TokenMatch = {
   matched: boolean;
 };
 
-export function titleSearchScore(title: EnrichedTitle, rawQuery: string) {
+export function titleSearchScore(title: TableTitle, rawQuery: string) {
   const query = normalizeSearchText(rawQuery);
   if (!query) return 1;
 
@@ -84,7 +84,7 @@ export function titleSearchScore(title: EnrichedTitle, rawQuery: string) {
   return score + coverageBoost + orderedBoost + titleBoost;
 }
 
-export function matchesTitleSearch(title: EnrichedTitle, rawQuery: string) {
+export function matchesTitleSearch(title: TableTitle, rawQuery: string) {
   return titleSearchScore(title, rawQuery) > 0;
 }
 

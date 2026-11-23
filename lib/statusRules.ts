@@ -61,6 +61,8 @@ export function nextActionForTitle(title: Pick<EnrichedTitle, "missingFields" | 
   return "Monitor";
 }
 
+const IST_OFFSET_MS = 330 * 60 * 1000;
+
 export function toIndiaDateKey(value: string | Date | null | undefined) {
   if (!value) return null;
   const date = value instanceof Date ? value : new Date(value);
@@ -68,15 +70,8 @@ export function toIndiaDateKey(value: string | Date | null | undefined) {
     const text = String(value);
     return /^\d{4}-\d{2}-\d{2}/.test(text) ? text.slice(0, 10) : null;
   }
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Asia/Kolkata",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit"
-    })
-      .formatToParts(date)
-      .map((part) => [part.type, part.value])
-  );
-  return `${parts.year}-${parts.month}-${parts.day}`;
+  // India is always UTC+05:30 (no daylight saving), so shift and read the UTC date.
+  // This replaces a new Intl.DateTimeFormat per call, which was the slowest part of
+  // building the home dashboard (it runs several times for every title).
+  return new Date(date.getTime() + IST_OFFSET_MS).toISOString().slice(0, 10);
 }

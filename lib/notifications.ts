@@ -159,16 +159,27 @@ export async function generateUserActionNotifications(user: UserRecord | null) {
 export async function generateSupervisorAttentionNotifications(user: UserRecord, titles: EnrichedTitle[]) {
   const scoped = titles.filter((title) => samePerson(title.supervisor, user.name));
   const today = todayKey();
+  const pending: NotificationInput[] = [];
+  const createSupervisorTitleNotification = (
+    recipient: UserRecord,
+    title: EnrichedTitle,
+    type: string,
+    severity: NotificationSeverity,
+    message: string,
+    dedupeKey: string
+  ) => {
+    pending.push(supervisorTitleNotification(recipient, title, type, severity, message, dedupeKey));
+  };
   for (const title of scoped) {
     if (isCompleted(title)) continue;
-    await createSupervisorTitleNotification(user, title, "Production Title Created", "Low", `${title.title} is in your production queue.`, `production_created:${title.id}:${user.id}`);
+    createSupervisorTitleNotification(user, title, "Production Title Created", "Low", `${title.title} is in your production queue.`, `production_created:${title.id}:${user.id}`);
 
     if (title.priority === "Ultra Urgent") {
-      await createSupervisorTitleNotification(user, title, "Ultra Urgent Title Assigned", "High", `Ultra Urgent title assigned to you: ${title.title}`, `ultra_assigned:${title.id}:${user.id}`);
+      createSupervisorTitleNotification(user, title, "Ultra Urgent Title Assigned", "High", `Ultra Urgent title assigned to you: ${title.title}`, `ultra_assigned:${title.id}:${user.id}`);
     }
     if (title.writerDueDate === today) {
       const severity = title.priority === "Ultra Urgent" ? "Critical" : title.priority === "Urgent" ? "High" : "Medium";
-      await createSupervisorTitleNotification(
+      createSupervisorTitleNotification(
         user,
         title,
         title.priority === "Ultra Urgent" ? "Ultra Urgent Due Today" : "Title Due Today",
@@ -179,24 +190,25 @@ export async function generateSupervisorAttentionNotifications(user: UserRecord,
     }
     if (isPastDate(title.writerDueDate)) {
       const severity = title.priority === "Ultra Urgent" ? "Critical" : "High";
-      await createSupervisorTitleNotification(user, title, "Title Overdue", severity, `Title overdue: ${title.title}`, `title_overdue:${title.id}:${user.id}:${today}`);
+      createSupervisorTitleNotification(user, title, "Title Overdue", severity, `Title overdue: ${title.title}`, `title_overdue:${title.id}:${user.id}:${today}`);
     }
     if (title.missingFields.includes("Writer")) {
-      await createSupervisorTitleNotification(user, title, "Missing Writer", title.priority === "Ultra Urgent" ? "Critical" : "Medium", `Writer missing for: ${title.title}`, `missing_writer:${title.id}:${user.id}`);
+      createSupervisorTitleNotification(user, title, "Missing Writer", title.priority === "Ultra Urgent" ? "Critical" : "Medium", `Writer missing for: ${title.title}`, `missing_writer:${title.id}:${user.id}`);
     }
     if (title.missingFields.includes("Help Doc")) {
-      await createSupervisorTitleNotification(user, title, "Missing Help Doc", title.priority === "Urgent" || title.priority === "Ultra Urgent" ? "High" : "Medium", `Help doc missing for: ${title.title}`, `missing_help_doc:${title.id}:${user.id}`);
+      createSupervisorTitleNotification(user, title, "Missing Help Doc", title.priority === "Urgent" || title.priority === "Ultra Urgent" ? "High" : "Medium", `Help doc missing for: ${title.title}`, `missing_help_doc:${title.id}:${user.id}`);
     }
     if (hoursSinceUpdate(title) >= 48) {
-      await createSupervisorTitleNotification(user, title, "No Update In 48 Hours", "Medium", `No update in 48 hours: ${title.title}`, `stale_48h:${title.id}:${user.id}:${today}`);
+      createSupervisorTitleNotification(user, title, "No Update In 48 Hours", "Medium", `No update in 48 hours: ${title.title}`, `stale_48h:${title.id}:${user.id}:${today}`);
     }
     if (isWaitingForAhtesham(title)) {
-      await createSupervisorTitleNotification(user, title, "Waiting For Ahtesham Decision", "High", `Waiting for Ahtesham decision: ${title.title}`, `waiting_ahtesham:${title.id}:${user.id}`);
+      createSupervisorTitleNotification(user, title, "Waiting For Ahtesham Decision", "High", `Waiting for Ahtesham decision: ${title.title}`, `waiting_ahtesham:${title.id}:${user.id}`);
     }
     if (title.blocked) {
-      await createSupervisorTitleNotification(user, title, "Blocked Title", title.priority === "Ultra Urgent" ? "Critical" : "High", `Blocked title: ${title.title}`, `blocked_title:${title.id}:${user.id}`);
+      createSupervisorTitleNotification(user, title, "Blocked Title", title.priority === "Ultra Urgent" ? "Critical" : "High", `Blocked title: ${title.title}`, `blocked_title:${title.id}:${user.id}`);
     }
   }
+  await createNotificationsBatch(pending);
 }
 
 export async function getUserNotifications(user: UserRecord | null, limit = 50) {
@@ -259,6 +271,7 @@ export async function markAllNotificationsRead(user: UserRecord | null) {
 
 async function generateAdminAttentionNotifications(user: UserRecord, titles: EnrichedTitle[]) {
   const today = todayKey();
+  const pending: NotificationInput[] = [];
   for (const title of titles) {
     if (isCompleted(title)) continue;
     const shouldNotify =
@@ -269,7 +282,7 @@ async function generateAdminAttentionNotifications(user: UserRecord, titles: Enr
       isPastDate(title.writerDueDate);
     if (!shouldNotify) continue;
     const severity = title.priority === "Ultra Urgent" && (title.blocked || isPastDate(title.writerDueDate) || title.writerDueDate === today) ? "Critical" : "High";
-    await createNotification({
+    pending.push({
       recipientUserId: user.id?.startsWith("demo-") ? null : user.id,
       recipientName: user.name,
       titleId: title.id,
@@ -283,17 +296,18 @@ async function generateAdminAttentionNotifications(user: UserRecord, titles: Enr
       dedupeKey: `admin_attention:${title.id}:${user.id}:${today}`
     });
   }
+  await createNotificationsBatch(pending);
 }
 
-async function createSupervisorTitleNotification(
+function supervisorTitleNotification(
   user: UserRecord,
   title: EnrichedTitle,
   type: string,
   severity: NotificationSeverity,
   message: string,
   dedupeKey: string
-) {
-  await createNotification({
+): NotificationInput {
+  return {
     recipientUserId: user.id?.startsWith("demo-") ? null : user.id,
     recipientName: user.name,
     titleId: title.id,
@@ -305,7 +319,87 @@ async function createSupervisorTitleNotification(
     supervisorName: title.supervisor,
     dueDate: title.writerDueDate,
     dedupeKey
-  });
+  };
+}
+
+/**
+ * Creates many deduped notifications with a handful of queries.
+ * The old loop made two sequential database calls per alert (often hundreds),
+ * which is why opening Notifications could take a very long time.
+ */
+async function createNotificationsBatch(inputs: NotificationInput[]) {
+  if (!hasSupabaseAdminConfig() || inputs.length === 0) return;
+  const supabase = createSupabaseAdminClient();
+
+  const byKey = new Map<string, NotificationInput>();
+  for (const input of inputs) {
+    if (input.dedupeKey && !byKey.has(input.dedupeKey)) byKey.set(input.dedupeKey, input);
+  }
+  const keys = [...byKey.keys()];
+  if (keys.length === 0) return;
+
+  const existing = new Set<string>();
+  const lookups = await Promise.all(
+    chunk(keys, 100).map((part) => supabase.from("notifications").select("dedupe_key").in("dedupe_key", part))
+  );
+  for (const lookup of lookups) {
+    if (lookup.error) {
+      if (isMissingOptionalNotificationColumn(lookup.error)) return createNotificationsSequentially(inputs);
+      if (isMissingNotificationsTable(lookup.error)) return;
+      throw lookup.error;
+    }
+    for (const row of lookup.data ?? []) if (row.dedupe_key) existing.add(row.dedupe_key);
+  }
+
+  const rows = keys
+    .filter((key) => !existing.has(key))
+    .map((key) => {
+      const input = byKey.get(key)!;
+      const recipientName = clean(input.recipientName);
+      return {
+        recipient_user_id: input.recipientUserId ?? null,
+        recipient_name: recipientName,
+        title_id: input.titleId ?? null,
+        brainstorming_title_id: input.brainstormingTitleId ?? null,
+        session_id: input.sessionId ?? null,
+        type: input.type,
+        severity: input.severity ?? "Low",
+        message: input.message,
+        link_url: input.linkUrl ?? input.actionUrl ?? null,
+        action_url: input.actionUrl ?? input.linkUrl ?? null,
+        dedupe_key: key,
+        related_title_name: input.relatedTitleName ?? null,
+        supervisor_name: input.supervisorName ?? recipientName,
+        due_date: input.dueDate ?? null
+      };
+    })
+    .filter((row) => row.recipient_user_id || row.recipient_name);
+
+  for (const part of chunk(rows, 500)) {
+    const { error } = await supabase.from("notifications").insert(part);
+    if (!error) continue;
+    if (isMissingOptionalNotificationColumn(error)) return createNotificationsSequentially(inputs);
+    // 23505 = another page load inserted some of these at the same moment; fall back to one-by-one for this chunk.
+    if (String((error as { code?: string }).code) === "23505") {
+      for (const row of part) {
+        const single = await supabase.from("notifications").insert(row);
+        if (single.error && String((single.error as { code?: string }).code) !== "23505") throw single.error;
+      }
+      continue;
+    }
+    if (!isMissingNotificationsTable(error)) throw error;
+    return;
+  }
+}
+
+async function createNotificationsSequentially(inputs: NotificationInput[]) {
+  for (const input of inputs) await createNotification(input);
+}
+
+function chunk<T>(items: T[], size: number) {
+  const parts: T[][] = [];
+  for (let index = 0; index < items.length; index += size) parts.push(items.slice(index, index + size));
+  return parts;
 }
 
 async function getDerivedApprovalNotifications(user: UserRecord, limit: number) {

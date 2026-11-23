@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { EnrichedTitle, OperationsQueue as OperationsQueueType } from "@/lib/types";
 
 export function OperationsQueue({ queue }: { queue: OperationsQueueType }) {
@@ -26,7 +27,7 @@ function QueueBlock({ title, titles }: { title: string; titles: EnrichedTitle[] 
       <ul className="mt-3 space-y-2">
         {titles.slice(0, 6).map((item) => (
           <li key={item.id} className="text-sm text-black/70">
-            <span className="font-medium text-ink">{item.title}</span>
+            <Link href={`/titles/${item.id}`} className="font-medium text-ink hover:text-moss hover:underline">{item.title}</Link>
             <span className="block text-xs text-black/50">
               {item.channel} | {item.supervisor} | {item.ageDays}d
             </span>

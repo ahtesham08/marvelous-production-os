@@ -1,9 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { requireApiUser } from "@/lib/apiAuth";
 import { createFreshTitles, parseBrainstormingText, type FreshTitleInput } from "@/lib/freshTitles";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
+  const auth = await requireApiUser(["Admin", "Supervisor"]);
+  if (!auth.ok) return auth.response;
   const payload = (await request.json()) as { text?: string; titles?: FreshTitleInput[] };
   const titles = payload.titles ?? parseBrainstormingText(payload.text ?? "");
 

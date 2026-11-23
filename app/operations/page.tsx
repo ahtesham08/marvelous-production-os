@@ -1,3 +1,4 @@
+import { toClientTitle } from "@/lib/tableTitle";
 import { OperationsQueue } from "@/components/OperationsQueue";
 import { TitleTable } from "@/components/TitleTable";
 import { OperationsInlineQueue } from "@/components/mvp3/OperationsInlineQueue";
@@ -45,7 +46,7 @@ export default async function OperationsPage() {
         ))}
       </section>
       <OperationsQueue queue={data.operationsQueue} />
-      <OperationsInlineQueue titles={uniqueTitles} />
+      <OperationsInlineQueue titles={uniqueTitles.slice(0, 20).map(toClientTitle)} />
       <TitleTable titles={uniqueTitles} />
     </div>
   );

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { toIndiaDateKey } from "@/lib/statusRules";
 import type { EnrichedTitle } from "@/lib/types";
 
 type Section = {
@@ -47,7 +48,8 @@ export function FreshStartSections({ titles }: { titles: EnrichedTitle[] }) {
 
 function isToday(value: string | null) {
   if (!value) return false;
-  return value === new Date().toISOString().slice(0, 10);
+  // Team works on India time; the server clock is UTC.
+  return value === toIndiaDateKey(new Date());
 }
 
 function isThisWeek(value: string | null) {
