@@ -58,18 +58,21 @@ export async function saveUser(input: Partial<UserRecord> & { name: string; role
 }
 
 async function seedSupabaseUsers() {
+  // One lookup for all seed names instead of one query per person on every page load.
+  // (maybeSingle() also errored when a name existed twice, which could insert duplicates.)
   const supabase = createSupabaseAdminClient();
-  for (const user of seedUsers) {
-    const { data } = await supabase.from("users").select("id").eq("name", user.name).maybeSingle();
-    if (!data) {
-      await supabase.from("users").insert({
-        name: user.name,
-        email: null,
-        role: user.role,
-        active: true
-      });
-    }
-  }
+  const { data, error } = await supabase
+    .from("users")
+    .select("name")
+    .in(
+      "name",
+      seedUsers.map((user) => user.name)
+    );
+  if (error) return;
+  const existing = new Set((data ?? []).map((row) => String(row.name)));
+  const missing = seedUsers.filter((user) => !existing.has(user.name));
+  if (missing.length === 0) return;
+  await supabase.from("users").insert(missing.map((user) => ({ name: user.name, email: null, role: user.role, active: true })));
 }
 
 function clean(value: unknown) {
